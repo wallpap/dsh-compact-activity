@@ -170,6 +170,14 @@ dsh --profile web --dump-config
 
 过长的实时摘要会自动截断，不会挤压页面布局。
 
+## 效果展示
+<img width="1263" height="810" alt="image" src="https://github.com/user-attachments/assets/444d9b55-dca7-4d61-82ed-aab6bddf95ff" />
+--------
+<img width="1228" height="299" alt="image" src="https://github.com/user-attachments/assets/90fdc15b-d58d-41f3-954c-68a751fc7ee8" />
+--------
+<img width="1034" height="548" alt="image" src="https://github.com/user-attachments/assets/8b3b8d68-59fa-425f-8f2b-ea0d03c6e37d" />
+
+
 ## 更新与卸载
 
 更新到 npm 上的最新版本：
