@@ -16,7 +16,8 @@
 
 ## 从 npm 安装
 
-发布后，直接把预构建包加入 Web profile：
+[`dsh-compact-activity@1.0.0`](https://www.npmjs.com/package/dsh-compact-activity)
+已发布到 npm。直接把预构建包加入 Web profile：
 
 ```sh
 dsh plugin --profile web add dsh-compact-activity

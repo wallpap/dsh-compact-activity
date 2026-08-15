@@ -37,7 +37,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/activity-group.test.ts",
     "check": "pnpm run typecheck && pnpm run test && pnpm run build",
-    "prepack": "pnpm run build"
+    "prepack": "npm run build"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
