@@ -19,6 +19,7 @@
     "types": ["node", "react"]
   },
   "include": [
+    "scripts",
     "src",
     "test",
     "tsdown.config.ts"

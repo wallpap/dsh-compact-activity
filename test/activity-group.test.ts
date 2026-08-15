@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { AssistantBlock, ChatNodeStore, RunningToolCall } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  AssistantBlock, ChatNodeStore, RunningToolCall, ToolCallBlock, ToolResultNode,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { activityGroups } from '../src/client/activity-group.ts'
 
@@ -17,7 +19,36 @@ function assistant(key: string, blocks: readonly AssistantBlock[]): ChatNode<'as
   }
 }
 
+function settledTool(callId: string, name: string, subCalls: readonly ToolCallBlock[] = []): ToolResultNode {
+  return {
+    kind: 'tool-result',
+    seq: 0,
+    time: 0,
+    callId,
+    call: { name, argsRaw: '{}' },
+    callTime: 0,
+    content: [],
+    isError: false,
+    callView: null,
+    resultView: null,
+    subCalls,
+  }
+}
+
 function tool(key: string, name: string): ChatNode<'tool-call'> {
+  return {
+    key,
+    id: key,
+    kind: 'tool-call',
+    target: 'chat',
+    anchorSeq: 0,
+    location: { kind: 'unresolved' },
+    visibility: 'visible',
+    data: { root: settledTool(key, name) },
+  }
+}
+
+function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
   const root: RunningToolCall = {
     callId: key,
     name,
@@ -26,7 +57,7 @@ function tool(key: string, name: string): ChatNode<'tool-call'> {
     step: 1,
     time: 0,
     callView: null,
-    subCalls: [],
+    subCalls,
   }
   return {
     key,
@@ -66,4 +97,10 @@ test('groups multiple process rows but leaves output and a single process row of
   assert.equal(groups[0]?.count, '2 段思考 · 1 次工具调用')
   assert.equal(groups[0]?.running, false)
   assert.equal(activityGroups(['answer'], nodeStore([nodes[2] as ChatNode])).length, 0)
+
+  const nested = runningTool('nested', 'run_code', [settledTool('child', 'read')])
+  const running = activityGroups(['reason', 'nested'], nodeStore([nodes[0] as ChatNode, nested]))[0]
+  assert.equal(running?.running, true)
+  assert.equal(running?.latestKind, 'tool')
+  assert.equal(running?.count, '1 段思考 · 2 次工具调用')
 })

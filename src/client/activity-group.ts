@@ -96,7 +96,10 @@ function groupFrom(
     if (node?.kind === 'tool-call') return toolEntries(node.data.root, node.key)
     return node?.kind === 'assistant-step' ? reasoningEntries(node) : []
   })
-  const latest = entries.at(-1)
+  // 父工具可以仍在运行，而其最后一个子工具已经结束。此时应继续显示进行中，
+  // 并以最后一个运行项作为实时状态来源；全部结束后才回退到最后一个过程项。
+  const running = entries.findLast(entry => entry.running)
+  const latest = running ?? entries.at(-1)
   if (latest === undefined) throw new Error('activity group requires at least one activity entry')
   return {
     firstKey: keys[0] ?? '',
@@ -105,8 +108,8 @@ function groupFrom(
     latestKey: latest.rowKey,
     latestKind: latest.kind,
     count: countSummary(entries),
-    running: latest.running,
-    error: latest.error,
+    running: running !== undefined,
+    error: running === undefined && latest.error,
   }
 }
 

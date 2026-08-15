@@ -1,6 +1,6 @@
 {
   "name": "dsh-compact-activity",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Codex-style one-line disclosures for DeepSeek Harness reasoning and tool activity",
   "author": "wallpap",
   "repository": {
@@ -33,10 +33,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && tsdown",
+    "build": "node scripts/clean.ts && tsc -p tsconfig.build.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/activity-group.test.ts",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "check": "npm run typecheck && npm run test && npm run build",
     "prepack": "npm run build"
   },
   "engines": {

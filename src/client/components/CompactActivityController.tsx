@@ -40,7 +40,8 @@ function oneLine(value: string | null | undefined): string {
 function officialToolSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup): string {
   const row = rows.get(group.latestKey)
   const tools = row === undefined ? [] : [...row.querySelectorAll<HTMLElement>('[data-tool]')]
-  const disclosure = tools.at(-1)?.querySelector<HTMLElement>('[data-disclosure-row]')
+  const tool = tools.findLast(item => item.dataset['state'] === 'running') ?? tools.at(-1)
+  const disclosure = tool?.querySelector<HTMLElement>('[data-disclosure-row]')
   if (disclosure === null || disclosure === undefined) return '工具执行中'
   const parts = [...disclosure.children]
     .slice(1)
