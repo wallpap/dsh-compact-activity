@@ -1,0 +1,80 @@
+{
+  "name": "dsh-compact-activity",
+  "version": "1.0.0",
+  "description": "Codex-style one-line disclosures for DeepSeek Harness reasoning and tool activity",
+  "author": "wallpap",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wallpap/dsh-compact-activity.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wallpap/dsh-compact-activity/issues"
+  },
+  "homepage": "https://github.com/wallpap/dsh-compact-activity#readme",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/activity-group.test.ts",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "prepack": "pnpm run build"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-ui-conversation": "*",
+    "@deepseek-ai/dsh-client-ui-slots": "*",
+    "react": ">=18 <20"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@types/node": "^24.0.0",
+    "@types/react": "~18.3.1",
+    "react": "^18.3.1",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3"
+  },
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  }
+}
