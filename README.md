@@ -24,7 +24,9 @@
 
 插件只调整 Web 界面的展示方式，不修改模型上下文、会话日志或工具执行。
 
-## 一条命令安装
+## 安装
+
+### 官方 CLI / Web（Linux、macOS、Windows）
 
 在终端中运行：
 
@@ -40,6 +42,56 @@ dsh --profile web
 
 插件默认启用，不需要额外配置。
 
+### DeepSeek Harness Desktop（Windows）
+
+Desktop 与官方 Web 版共用 `~/.dsh/profiles/web`，插件包和 profile 配置完全兼容。
+安装完成后，Desktop 会从同一个 Web profile 加载本插件。
+
+只安装了 Desktop 时，可以使用项目提供的 PowerShell 安装脚本。它复用 Desktop 自带的
+Electron/Node 和 DSH CLI，因此不需要额外安装 Node.js、npm、全局 pnpm 或全局 DSH。
+安装前请从系统托盘完全退出 Desktop。
+
+先下载并检查脚本：
+
+```powershell
+$installer = Join-Path $env:TEMP 'install-dsh-compact-activity.ps1'
+Invoke-WebRequest `
+  'https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1' `
+  -OutFile $installer
+Get-Content -LiteralPath $installer
+Unblock-File -LiteralPath $installer
+```
+
+然后传入 Desktop 安装目录：
+
+```powershell
+& $installer -DesktopRoot 'D:\DSH\DeepSeek Harness'
+```
+
+脚本会根据 Windows 架构下载 pnpm 官方便携版，校验固定的 SHA-256，并缓存到
+`%LOCALAPPDATA%\dsh-compact-activity\tools`。随后它通过 Desktop 内置的 DSH CLI 执行官方
+`dsh plugin` 安装流程并检查配置树。脚本不会修改 Desktop 安装目录，也不会手动编辑 profile。
+安装完成后重新打开 Desktop。GitHub 下载需要代理时，可设置 `HTTPS_PROXY`，或向脚本传入
+`-Proxy 'http://127.0.0.1:端口'`。脚本不会保存代理设置。
+
+卸载时复用已经下载的脚本：
+
+```powershell
+& $installer -DesktopRoot 'D:\DSH\DeepSeek Harness' -Remove
+```
+
+如果终端中已经可以运行 `dsh` 和 `pnpm`，也可以直接使用上方官方 CLI 命令；Windows
+Desktop 用户不需要为了运行或安装本插件而额外安装这些工具。
+
+### DeepSeek Harness Desktop（macOS）
+
+当前 PowerShell helper 仅支持 Windows，不能在 macOS 上运行。macOS Desktop 用户目前请使用
+上方官方 CLI 命令安装插件；Node.js 和 pnpm 只用于管理插件，Desktop 运行本身不依赖用户安装的
+Node.js。安装前完全退出 Desktop，安装后重新打开。
+
+macOS 免 Node helper 尚未经过真实设备、应用包内部路径、签名和 Gatekeeper 环境验证，因此
+当前版本不宣称支持。不要把 Windows 脚本转换后直接执行，也不要手动修改 `.app` 内容或 profile。
+
 ### 让 Agent 帮你安装
 
 如果你的 Agent 可以使用终端，把下面这段话直接发给它：
@@ -47,17 +99,46 @@ dsh --profile web
 ```text
 请为当前用户安装 dsh-compact-activity 插件：
 
-1. 确认 dsh 命令可用。
-2. 运行：dsh plugin --profile web add dsh-compact-activity
-3. 运行：dsh --profile web --dump-config
-4. 确认输出包含 ui-compact-activity。
-5. 如果 DSH Web 已经运行，只提醒我重启，不要终止未知进程。
+目标：把插件安装到当前用户的 DSH web profile，并验证它已经进入配置树。
 
-不要修改当前项目源码，也不要安装全局 npm 包。
-完成后告诉我执行结果和人工检查地址。
+1. 先判断用户使用哪种运行方式：
+   - Linux、macOS 或 Windows 上的官方 DSH CLI/Web；
+   - Windows DeepSeek Harness Desktop；或
+   - macOS DeepSeek Harness Desktop。
+2. 官方 CLI/Web：
+   - 确认 dsh 和 pnpm 可用；
+   - 运行：dsh plugin --profile web add dsh-compact-activity
+   - 运行：dsh --profile web --dump-config
+3. Windows Desktop：
+   - 定位安装目录，并确认存在 DeepSeek Harness.exe 和
+     resources/host/node_modules/@deepseek-ai/dsh/lib/bin.js；
+   - 不要安装 Node.js、npm、全局 pnpm 或全局 DSH；
+   - 从以下地址下载脚本到临时目录，并在执行前读取内容：
+     https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1
+   - 请用户从系统托盘完全退出 Desktop；不要强制结束进程；
+   - 运行脚本并通过 -DesktopRoot 传入安装目录；脚本会完成安装和配置验证。
+4. macOS Desktop：
+   - 当前没有经过验证的免 Node helper，不要运行或转换 Windows PowerShell 脚本；
+   - 如果 dsh 和 pnpm 已可用，按官方 CLI/Web 流程安装；
+   - 如果命令不可用，先说明安装插件需要 Node.js 和 pnpm，并在安装这些工具前获得用户许可；
+   - 不要修改应用包内容或手动编辑 profile。
+5. 验证安装：
+   - 官方 CLI 的配置输出应同时包含 # == dsh-compact-activity、
+     id: ui-compact-activity 和 name: dsh-compact-activity；
+   - Windows Desktop helper 应以退出码 0 结束，并显示“安装和配置验证完成”。helper 内部会检查
+     id: ui-compact-activity 和 name: dsh-compact-activity。
+6. 告诉用户重新启动：
+   - Desktop 用户重新打开对应的 Desktop；
+   - CLI/Web 用户运行 dsh --profile web。
+
+不要修改当前项目源码、~/.dsh/profiles/web/package.json，或 Desktop 安装目录中的
+resources/host。不要手动复制插件文件。Desktop helper 内部也必须通过 dsh plugin 完成安装。
+完成后报告执行过的命令、版本、验证结果和启动方式。
 ```
 
 ### 验证安装
+
+Windows Desktop helper 已自动完成等价验证。使用官方 CLI 时可以手动运行：
 
 ```sh
 dsh --profile web --dump-config
@@ -75,7 +156,7 @@ dsh --profile web --dump-config
 
 ## 使用方式
 
-插件没有设置页面，安装并重启 DSH Web 后自动生效：
+插件没有设置页面，安装并重启 DSH Web 或 Desktop 后自动生效：
 
 | 场景 | 显示行为 |
 | --- | --- |
@@ -144,7 +225,8 @@ npm pack --dry-run
 
 ```text
 scripts/
-└── clean.ts                         # 使用 Node 原生 TypeScript 清理构建目录
+├── clean.ts                         # 使用 Node 原生 TypeScript 清理构建目录
+└── install-desktop.ps1              # Windows Desktop 免 Node 安装与卸载 helper
 src/
 ├── index.ts                         # Host 入口，让 Loader 发现浏览器插件
 └── client/
@@ -160,7 +242,17 @@ src/
 
 ## 兼容性
 
-类型检查基线为 DSH `0.1.0-rc.6`。插件依赖以下 DSH Web 扩展点和稳定标记：
+已验证环境：
+
+| 运行环境 | 版本 | 结果 |
+| --- | --- | --- |
+| DeepSeek Harness 官方 Web | `0.1.0-rc.6` | 类型检查、构建和真实 UI 测试通过 |
+| DeepSeek Harness Desktop（Windows） | 内置 DSH `0.1.0-rc.5` | 与 `dsh-better-sidebar` 同时加载及真实会话折叠测试通过 |
+
+macOS Desktop 尚未进行真实设备和应用包测试，因此不列入已验证环境。Linux 和 macOS 用户
+可以通过官方 CLI/Web 使用插件。
+
+插件依赖以下 DSH Web 扩展点和稳定标记：
 
 - `conversation.session.header.actions`
 - Chat Flow 的 `data-chat-flow` 与 `data-chat-flow-key`
