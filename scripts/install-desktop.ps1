@@ -218,9 +218,10 @@ Assert-DesktopStopped -DesktopExe $desktopExe
 $pnpmExe = Get-PortablePnpm
 
 $action = if ($Remove) { 'remove' } else { 'add' }
+$package = if ($Remove) { $pluginName } else { "$pluginName@latest" }
 Write-Host "Desktop：$resolvedRoot"
-Write-Host "操作：$action $pluginName"
-Invoke-DesktopDsh -DesktopExe $desktopExe -CliEntry $cliEntry -PnpmExe $pnpmExe -Arguments @('plugin', '--profile', 'web', $action, $pluginName) -ShowOutput | Out-Null
+Write-Host "操作：$action $package"
+Invoke-DesktopDsh -DesktopExe $desktopExe -CliEntry $cliEntry -PnpmExe $pnpmExe -Arguments @('plugin', '--profile', 'web', $action, $package) -ShowOutput | Out-Null
 
 $config = Invoke-DesktopDsh -DesktopExe $desktopExe -CliEntry $cliEntry -PnpmExe $pnpmExe -Arguments @('web', '--dump-config')
 $configured = $config -match 'id:\s+ui-compact-activity' -and
