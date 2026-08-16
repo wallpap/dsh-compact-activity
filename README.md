@@ -78,49 +78,48 @@ profile。安装前完全退出 Desktop，完成后重新打开。
 
 1. 检查操作系统、是否使用 Desktop，以及 dsh、pnpm 是否可用。npm 不能替代 pnpm。
 2. 只选择一条安装路径：
-   - dsh 和 pnpm 均可用：Desktop 用户先从系统托盘完全退出，然后运行
-     `dsh plugin --profile web add dsh-compact-activity@latest`。
-   - Windows Desktop 缺少任一命令：定位 Desktop 安装目录，确认其中存在
-     `DeepSeek Harness.exe` 和 `resources/host/node_modules/@deepseek-ai/dsh/lib/bin.js`；下载并
-     阅读 `https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1`，
-     请用户从系统托盘完全退出 Desktop，再通过 `-DesktopRoot` 运行；不要强制结束进程，也不要
-     安装全局 Node.js、npm、pnpm 或 dsh。
-   - macOS Desktop 缺少任一命令：停止安装，说明需要 dsh 和 pnpm，并在安装依赖前取得用户许可。
-     不要运行或转换 Windows helper。
-3. CLI 路径运行 `dsh --profile web --dump-config`；输出必须包含 `id: ui-compact-activity` 和
-   `name: dsh-compact-activity`。Windows helper 必须以退出码 0 完成并显示“安装和配置验证完成”。
+  - dsh 和 pnpm 均可用：
+    Desktop 用户先从系统托盘完全退出，然后运行`dsh plugin --profile web add dsh-compact-activity@latest`。
+  - Windows Desktop 缺少任一命令：
+    定位 Desktop 安装目录，确认其中存在`DeepSeek Harness.exe` 和 `resources/host/node_modules/@deepseek-ai/dsh/lib/bin.js`；
+    下载并阅读 `https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1`，请用户从系统托盘完全退出 Desktop，再通过 `-DesktopRoot` 运行；
+    不要强制结束进程，也不要安装全局 Node.js、npm、pnpm 或 dsh。
+  - macOS Desktop 缺少任一命令：
+    停止安装，说明需要 dsh 和 pnpm，并在安装依赖前取得用户许可。
+    不要运行或转换 Windows helper。
+3. CLI 路径运行 `dsh --profile web --dump-config`；
+  输出必须包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。Windows helper 必须以退出码 0 完成并显示“安装和配置验证完成”。
 4. 不要手动编辑 `~/.dsh/profiles/web/package.json`、Desktop 文件或应用包，也不要手动复制插件。
-5. 从 web profile 中已安装包的 `package.json` 读取实际版本。报告版本、安装路径、验证结果，
-   以及用户应重新打开 Desktop 还是运行 `dsh --profile web`。
+5. 从 web profile 中已安装包的 `package.json` 读取实际版本。报告版本、安装路径、验证结果，以及用户应重新打开 Desktop 还是运行 `dsh --profile web`。
 ```
 
 ## 使用方式
 
 插件没有设置页面，安装并重启 DSH Web 或 Desktop 后自动生效：
 
-| 场景 | 显示行为 |
-| --- | --- |
-| 多条连续过程消息 | 合并为一个默认收起的总折叠项 |
-| 正在思考 | 显示 `进行中...`、计数和 `正在思考` |
-| 正在调用工具 | 显示最后一个官方工具的类型和摘要 |
-| 工作完成 | 显示 `已完成` 和计数，不显示摘要 |
-| 展开总过程 | 显示原版 Think 和工具组件，保留官方交互 |
-| 单条过程消息 | 不分组，保持 DSH 官方显示 |
-| 思考后紧接模型正文 | 只折叠 Think，正文继续显示 |
+| 场景               | 显示行为                                |
+| ------------------ | --------------------------------------- |
+| 多条连续过程消息   | 合并为一个默认收起的总折叠项            |
+| 正在思考           | 显示 `进行中...`、计数和 `正在思考`     |
+| 正在调用工具       | 显示最后一个官方工具的类型和摘要        |
+| 工作完成           | 显示 `已完成` 和计数，不显示摘要        |
+| 展开总过程         | 显示原版 Think 和工具组件，保留官方交互 |
+| 单条过程消息       | 不分组，保持 DSH 官方显示               |
+| 思考后紧接模型正文 | 只折叠 Think，正文继续显示              |
 
 过长的实时摘要会自动截断，不会挤压页面布局。
 
 ## 效果展示
+
 <img width="1263" height="810" alt="image" src="https://github.com/user-attachments/assets/444d9b55-dca7-4d61-82ed-aab6bddf95ff" />
 
---------
+---
 
 <img width="1228" height="299" alt="image" src="https://github.com/user-attachments/assets/90fdc15b-d58d-41f3-954c-68a751fc7ee8" />
 
---------
+---
 
 <img width="1034" height="548" alt="image" src="https://github.com/user-attachments/assets/8b3b8d68-59fa-425f-8f2b-ea0d03c6e37d" />
-
 
 ## 更新与卸载
 
@@ -196,9 +195,9 @@ src/
 
 已验证环境：
 
-| 运行环境 | 版本 | 结果 |
-| --- | --- | --- |
-| DeepSeek Harness 官方 Web | `0.1.0-rc.6` | 类型检查、构建和真实 UI 测试通过 |
+| 运行环境                            | 版本                  | 结果                                                   |
+| ----------------------------------- | --------------------- | ------------------------------------------------------ |
+| DeepSeek Harness 官方 Web           | `0.1.0-rc.6`          | 类型检查、构建和真实 UI 测试通过                       |
 | DeepSeek Harness Desktop（Windows） | 内置 DSH `0.1.0-rc.5` | 与 `dsh-better-sidebar` 同时加载及真实会话折叠测试通过 |
 
 macOS Desktop 尚未进行真实设备和应用包测试，因此不列入已验证环境。Linux 和 macOS 用户
