@@ -32,7 +32,8 @@
 仅有 Node.js/npm 不够，DSH 使用 pnpm 管理插件。
 
 ```sh
-dsh plugin --profile web add dsh-compact-activity@latest
+dsh plugin --profile web add dsh-compact-activity
+dsh plugin --profile web update dsh-compact-activity --latest
 dsh --profile web --dump-config
 ```
 
@@ -74,12 +75,14 @@ profile。安装前完全退出 Desktop，完成后重新打开。
 如果你的 Agent 可以使用终端，把下面这段话直接发给它：
 
 ```text
-请把 dsh-compact-activity@latest 安装到当前用户的 DSH web profile，并完成验证。
+请把最新版 dsh-compact-activity 安装到当前用户的 DSH web profile，并完成验证。
 
 1. 检查操作系统、是否使用 Desktop，以及 dsh、pnpm 是否可用。npm 不能替代 pnpm。
 2. 只选择一条安装路径：
   - dsh 和 pnpm 均可用：
-    Desktop 用户先从系统托盘完全退出，然后运行`dsh plugin --profile web add dsh-compact-activity@latest`。
+    Desktop 用户先从系统托盘完全退出，然后依次运行
+    `dsh plugin --profile web add dsh-compact-activity` 和
+    `dsh plugin --profile web update dsh-compact-activity --latest`。
   - Windows Desktop 缺少任一命令：
     定位 Desktop 安装目录，确认其中存在`DeepSeek Harness.exe` 和 `resources/host/node_modules/@deepseek-ai/dsh/lib/bin.js`；
     下载并阅读 `https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1`，请用户从系统托盘完全退出 Desktop，再通过 `-DesktopRoot` 运行；
@@ -126,7 +129,7 @@ profile。安装前完全退出 Desktop，完成后重新打开。
 更新到 npm 上的最新版本：
 
 ```sh
-dsh plugin --profile web add dsh-compact-activity@latest
+dsh plugin --profile web update dsh-compact-activity --latest
 ```
 
 卸载：
