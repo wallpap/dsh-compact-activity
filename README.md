@@ -39,6 +39,8 @@ dsh --dump-config
 
 Desktop 已内置 Node.js、pnpm 和 DSH。无需为本插件全局安装这些工具，也不要使用 npm 代替 pnpm。DSH Terminal 中的命令默认操作 Desktop 当前 profile，不要添加 `--profile web`。
 
+Desktop 的每个 profile 有独立的插件清单和构建配置。托盘从 `desktop` 切换到 `web` 后，之前安装在 `desktop` 的插件不会自动出现在 `web`；必须切换到目标 profile 后，在该 profile 的 DSH Terminal 中再次执行上面的安装、更新和验证命令。切回其他 profile 时同理。
+
 ### 普通 DSH CLI/Web
 
 适用于终端中已有 `dsh` 和 `pnpm` 的 Linux、macOS 和 Windows 环境。只有 Node.js 和 npm 无法安装 DSH 插件；请先按 DSH 官方方式配置 pnpm 和 DSH。
@@ -111,6 +113,24 @@ dsh plugin --profile web remove dsh-compact-activity
 ```
 
 操作后请重启 DSH Desktop 或 DSH Web。
+
+### Desktop 切换 profile 后插件不生效
+
+按以下顺序排查：
+
+1. 从托盘切换到需要使用插件的目标 profile。
+2. 从该 profile 打开 DSH Terminal，运行：
+
+   ```powershell
+   dsh plugin add dsh-compact-activity
+   dsh plugin update dsh-compact-activity --latest
+   dsh --dump-config
+   ```
+
+3. 确认输出同时包含 `id: ui-compact-activity`、`name: dsh-compact-activity`，并读取已安装包的实际版本和路径。
+4. 重启 DSH Desktop，再检查总过程折叠。
+
+如果目标 profile 已包含上述配置但仍无效果，记录 DSH/Desktop 版本、启动方式、实际插件版本、安装路径和浏览器控制台错误。不要编辑 profile 清单、复制插件文件或检查 `app.asar`；这些操作会绕过 Desktop 的正常插件加载流程。
 
 ## 从本地源码安装
 
