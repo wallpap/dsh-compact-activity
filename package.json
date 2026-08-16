@@ -1,6 +1,6 @@
 {
   "name": "dsh-compact-activity",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Codex-style one-line disclosures for DeepSeek Harness reasoning and tool activity",
   "author": "wallpap",
   "repository": {
@@ -28,7 +28,6 @@
   "files": [
     "lib",
     "src",
-    "scripts/install-desktop.ps1",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"

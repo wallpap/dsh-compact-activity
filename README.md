@@ -5,8 +5,7 @@
 
 让 DeepSeek Harness 的思考与工具调用更紧凑、更容易浏览。
 
-插件会把一段连续的模型工作过程收进一个 Codex 风格的单行折叠项。默认保持收起，
-需要查看细节时再展开；模型最终输出始终正常显示。
+插件会把连续的思考和工具调用收进一个单行折叠项。默认保持收起，需要查看细节时再展开；模型最终输出始终正常显示。
 
 ```text
 > 进行中...  2 段思考 · 3 次工具调用  Code · 正在读取项目文件...
@@ -15,9 +14,9 @@
 
 ## 为什么使用它
 
-- **减少滚动距离**：连续的思考和工具调用合并为一个总过程列表。
+- **减少滚动距离**：连续的思考和工具调用合并为一个折叠项。
 - **不改变官方内容**：展开后仍使用 DSH 官方 Think、Code 和工具组件。
-- **保留正文边界**：下一条模型 output 不会被折叠进过程列表。
+- **保留正文边界**：下一条模型正文不会被折叠进过程列表。
 - **实时显示状态**：执行期间显示 `进行中...`、计数和最后一项活动摘要。
 - **完成后保持简洁**：完成时只显示 `已完成` 和计数，不再显示过期摘要。
 - **单条消息不受影响**：只有一条思考或工具调用时，继续使用 DSH 官方行为。
@@ -26,10 +25,23 @@
 
 ## 安装
 
-### 已有 DSH CLI
+### DSH Desktop 2.0.0
 
-适用于 Linux、macOS、Windows，以及终端中可运行 `dsh` 和 `pnpm` 的 Desktop 用户。
-仅有 Node.js/npm 不够，DSH 使用 pnpm 管理插件。
+从系统托盘打开 DSH Terminal，针对当前 profile 运行：
+
+```powershell
+dsh plugin add dsh-compact-activity
+dsh plugin update dsh-compact-activity --latest
+dsh --dump-config
+```
+
+配置输出应包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。验证后重启 DSH Desktop。
+
+Desktop 已内置 Node.js、pnpm 和 DSH。无需为本插件全局安装这些工具，也不要使用 npm 代替 pnpm。DSH Terminal 中的命令默认操作 Desktop 当前 profile，不要添加 `--profile web`。
+
+### 普通 DSH CLI/Web
+
+适用于终端中已有 `dsh` 和 `pnpm` 的 Linux、macOS 和 Windows 环境。只有 Node.js 和 npm 无法安装 DSH 插件；请先按 DSH 官方方式配置 pnpm 和 DSH。
 
 ```sh
 dsh plugin --profile web add dsh-compact-activity
@@ -37,68 +49,26 @@ dsh plugin --profile web update dsh-compact-activity --latest
 dsh --profile web --dump-config
 ```
 
-配置输出应包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。验证后运行
-`dsh --profile web`，或重新打开 Desktop。插件默认启用。
-
-### Windows Desktop helper
-
-缺少 `dsh` 或 `pnpm` 时使用此方式；只有 npm 时也使用此方式。脚本复用 Desktop 自带的
-Electron/Node 和 DSH CLI，并自动下载经过 SHA-256 校验的便携版 pnpm。执行前请从系统托盘
-完全退出 Desktop。
-
-```powershell
-$installer = Join-Path $env:TEMP 'install-dsh-compact-activity.ps1'
-Invoke-WebRequest `
-  'https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1' `
-  -OutFile $installer
-Get-Content -LiteralPath $installer
-Unblock-File -LiteralPath $installer
-& $installer -DesktopRoot 'D:\DSH\DeepSeek Harness'
-```
-
-脚本会安装最新版本并验证配置，不修改 Desktop 安装目录或手动编辑 profile。完成后重新打开
-Desktop。需要代理时设置 `HTTPS_PROXY`，或传入 `-Proxy 'http://127.0.0.1:端口'`。
-
-卸载：
-
-```powershell
-& $installer -DesktopRoot 'D:\DSH\DeepSeek Harness' -Remove
-```
-
-### macOS Desktop
-
-使用上方 DSH CLI 流程。当前 helper 仅支持 Windows；不要转换脚本、修改 `.app` 或手动编辑
-profile。安装前完全退出 Desktop，完成后重新打开。
+配置输出应包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。验证后运行 `dsh --profile web`。插件默认启用。
 
 ### 让 Agent 帮你安装
 
 如果你的 Agent 可以使用终端，把下面这段话直接发给它：
 
 ```text
-请把最新版 dsh-compact-activity 安装到当前用户的 DSH web profile，并完成验证。
+请安装并验证最新版 dsh-compact-activity。
 
-1. 检查操作系统、是否使用 Desktop，以及 dsh、pnpm 是否可用。npm 不能替代 pnpm。
-2. 只选择一条安装路径：
-  - dsh 和 pnpm 均可用：
-    Desktop 用户先从系统托盘完全退出，然后依次运行
-    `dsh plugin --profile web add dsh-compact-activity` 和
-    `dsh plugin --profile web update dsh-compact-activity --latest`。
-  - Windows Desktop 缺少任一命令：
-    定位 Desktop 安装目录，确认其中存在`DeepSeek Harness.exe` 和 `resources/host/node_modules/@deepseek-ai/dsh/lib/bin.js`；
-    下载并阅读 `https://raw.githubusercontent.com/wallpap/dsh-compact-activity/main/scripts/install-desktop.ps1`，请用户从系统托盘完全退出 Desktop，再通过 `-DesktopRoot` 运行；
-    不要强制结束进程，也不要安装全局 Node.js、npm、pnpm 或 dsh。
-  - macOS Desktop 缺少任一命令：
-    停止安装，说明需要 dsh 和 pnpm，并在安装依赖前取得用户许可。
-    不要运行或转换 Windows helper。
-3. CLI 路径运行 `dsh --profile web --dump-config`；
-  输出必须包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。Windows helper 必须以退出码 0 完成并显示“安装和配置验证完成”。
-4. 不要手动编辑 `~/.dsh/profiles/web/package.json`、Desktop 文件或应用包，也不要手动复制插件。
-5. 从 web profile 中已安装包的 `package.json` 读取实际版本。报告版本、安装路径、验证结果，以及用户应重新打开 Desktop 还是运行 `dsh --profile web`。
+1. 如果目标是 DSH Desktop 2.0.0，直接定位并使用 Desktop 提供的 DSH Terminal 程序或启动入口。不要用普通 PowerShell、CMD 或其他终端代替。找不到 DSH Terminal 时停止并报告，不要猜测路径。
+2. 在 DSH Terminal 中运行 `dsh plugin add dsh-compact-activity`、`dsh plugin update dsh-compact-activity --latest` 和 `dsh --dump-config`。这些命令操作 Desktop 当前 profile，不要添加 `--profile web`。完成后提示用户重启 Desktop。
+3. 只有目标明确是普通 DSH CLI/Web 时，才运行 `dsh plugin --profile web add dsh-compact-activity`、`dsh plugin --profile web update dsh-compact-activity --latest` 和 `dsh --profile web --dump-config`。此路径需要 `dsh` 和 `pnpm`；npm 不能代替 pnpm。
+4. 配置输出必须包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。读取已安装包的 `package.json` 并报告实际版本、安装路径和验证结果。
+5. 如果定位或启动终端、执行命令、联网下载或读取验证结果需要当前没有的权限，立即向用户说明受阻操作、所需权限和用途，并请求授权。得到授权前不要继续，不要自行提权或绕过限制。
+6. 不要安装全局工具，不要检查 app.asar 内部路径，也不要编辑 profile 清单、修改 Desktop 应用文件或手动复制插件。
 ```
 
 ## 使用方式
 
-插件没有设置页面，安装并重启 DSH Web 或 Desktop 后自动生效：
+插件没有设置页面。安装后重启 DSH Web 或 Desktop，插件会自动生效：
 
 | 场景               | 显示行为                                |
 | ------------------ | --------------------------------------- |
@@ -126,19 +96,21 @@ profile。安装前完全退出 Desktop，完成后重新打开。
 
 ## 更新与卸载
 
-更新到 npm 上的最新版本：
+Desktop 2.0.0 在 DSH Terminal 中更新或卸载：
+
+```powershell
+dsh plugin update dsh-compact-activity --latest
+dsh plugin remove dsh-compact-activity
+```
+
+普通 CLI/Web 更新或卸载：
 
 ```sh
 dsh plugin --profile web update dsh-compact-activity --latest
-```
-
-卸载：
-
-```sh
 dsh plugin --profile web remove dsh-compact-activity
 ```
 
-更新或卸载后请重新启动 DSH Web。
+操作后请重启 DSH Desktop 或 DSH Web。
 
 ## 从本地源码安装
 
@@ -152,8 +124,7 @@ dsh --profile web --dump-config
 dsh --profile web
 ```
 
-如果使用 Harness 源码版，请在 Harness 源码根目录执行 `pnpm dsh ...`，并把 `.`
-换成本插件目录的绝对路径。
+如果使用 Harness 源码版，请在 Harness 源码根目录执行 `pnpm dsh ...`，并把 `.` 换成本插件目录的绝对路径。
 
 ### 从 tarball 安装
 
@@ -162,8 +133,7 @@ npm pack
 dsh plugin --profile web add ./dsh-compact-activity-<version>.tgz
 ```
 
-请将 `<version>` 替换为 `npm pack` 输出中的实际版本。tarball 已包含预构建的
-`lib/`，安装时不需要再次构建。
+请将 `<version>` 替换为 `npm pack` 输出中的实际版本。tarball 已包含预构建的 `lib/`，安装时不需要再次构建。
 
 ## 开发与验证
 
@@ -174,13 +144,11 @@ npm run build
 npm pack --dry-run
 ```
 
-`npm run check` 会依次执行严格类型检查、测试和生产构建。`prepack` 会在发布或
-打包前重新生成 `lib/`，避免发布过期构建产物。
+`npm run check` 会依次执行严格类型检查、测试和生产构建。`prepack` 会在发布或打包前重新生成 `lib/`，避免发布过期构建产物。
 
 ```text
 scripts/
-├── clean.ts                         # 使用 Node 原生 TypeScript 清理构建目录
-└── install-desktop.ps1              # Windows Desktop 免 Node 安装与卸载 helper
+└── clean.ts                         # 使用 Node 原生 TypeScript 清理构建目录
 src/
 ├── index.ts                         # Host 入口，让 Loader 发现浏览器插件
 └── client/
@@ -191,36 +159,31 @@ src/
         └── CompactActivityController.tsx # 控制官方过程行的总折叠状态
 ```
 
-`tsconfig.json` 开启 `strict`、`noUncheckedIndexedAccess` 和
-`exactOptionalPropertyTypes`，并检查源码、测试、构建配置及脚本。
+`tsconfig.json` 开启 `strict`、`noUncheckedIndexedAccess` 和 `exactOptionalPropertyTypes`，并检查源码、测试、构建配置及脚本。
 
 ## 兼容性
 
-已验证环境：
+兼容性状态：
 
-| 运行环境                            | 版本                  | 结果                                                   |
-| ----------------------------------- | --------------------- | ------------------------------------------------------ |
-| DeepSeek Harness 官方 Web           | `0.1.0-rc.6`          | 类型检查、构建和真实 UI 测试通过                       |
-| DeepSeek Harness Desktop（Windows） | 内置 DSH `0.1.0-rc.5` | 与 `dsh-better-sidebar` 同时加载及真实会话折叠测试通过 |
+| 运行环境                  | 版本                                 | 结果                                     |
+| ------------------------- | ------------------------------------ | ---------------------------------------- |
+| DeepSeek Harness 官方 Web | `0.1.0-rc.6`                         | 类型检查、构建和真实 UI 测试通过         |
+| DSH Desktop（Windows）     | `2.0.0`，内置 DSH `0.1.0-rc.6`       | 实机安装、更新、配置和 UI 验证通过       |
 
-macOS Desktop 尚未进行真实设备和应用包测试，因此不列入已验证环境。Linux 和 macOS 用户
-可以通过官方 CLI/Web 使用插件。
+Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
 插件依赖以下 DSH Web 扩展点和稳定标记：
 
 - `conversation.session.header.actions`
 - Chat Flow 的 `data-chat-flow` 与 `data-chat-flow-key`
-- 官方过程项的 `data-variant="think"`、`data-tool`、`data-state` 和
-  `data-disclosure-row`
+- 官方过程项的 `data-variant="think"`、`data-tool`、`data-state` 和 `data-disclosure-row`
 - `assistant-step` 与 `tool-call` Chat Node 数据
 
-这些标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程
-折叠、官方子项交互和工具实时摘要。
+这些标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互和工具实时摘要。
 
 ## 问题反馈
 
-遇到兼容性问题时，请在
-[GitHub Issues](https://github.com/wallpap/dsh-compact-activity/issues) 提交：
+遇到兼容性问题时，请在 [GitHub Issues](https://github.com/wallpap/dsh-compact-activity/issues) 提交：
 
 - DSH 版本和启动方式；
 - 插件版本；
