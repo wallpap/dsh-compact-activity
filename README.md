@@ -101,7 +101,7 @@ dsh --profile web --dump-config
 
 ## 效果展示
 
-<img width="1263" height="810" alt="image" src="https://github.com/user-attachments/assets/444d9b55-dca7-4d61-82ed-aab6bddf95ff" />
+<img width="1185" height="632" alt="image" src="https://github.com/user-attachments/assets/6f3bf6fb-141c-4b32-8d4f-c78095a6927d" />
 
 ---
 
