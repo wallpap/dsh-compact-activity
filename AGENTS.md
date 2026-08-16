@@ -53,6 +53,8 @@
 
 - Desktop 用户必须使用 Desktop 提供的 DSH Terminal，操作当前 profile，不要额外添加 `--profile web`。
 - Desktop profile 之间的插件清单和构建配置彼此独立；切换 profile 后不得假设插件会自动迁移，必须在目标 profile 重新安装、更新并通过 `dsh --dump-config` 验证。
+- Desktop 对新发布 npm 版本应用 24 小时最短发布时间策略；发布后立即验证必须使用明确版本号的 `dsh plugin add dsh-compact-activity@<version>`，不要用 `update --latest` 判断新版本是否可用。
+- React 和 DSH Client peer dependencies 由宿主模块加载器提供，必须在 `peerDependenciesMeta` 中保持 optional；不要指导用户把它们手动安装到 profile。
 - 普通 DSH CLI/Web 才使用 `dsh plugin --profile web ...`；`npm` 不能替代 DSH 所需的 `pnpm`。
 - 不安装全局工具，不编辑 profile 清单，不修改 Desktop 应用文件，不检查或改写 `app.asar`，不手动复制插件。
 - 任何联网下载、终端定位、文件写入、权限提升或发布操作遇到权限不足时立即报告并请求用户授权；不得自行提权或绕过限制。
