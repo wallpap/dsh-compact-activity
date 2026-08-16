@@ -9,7 +9,8 @@ export interface ActivityGroup {
     /** 最新过程项所在行；进行中时从该行复用官方摘要。 */
     readonly latestKey: string;
     readonly latestKind: 'reasoning' | 'tool';
-    readonly count: string;
+    readonly reasoningCount: number;
+    readonly toolCount: number;
     readonly running: boolean;
     readonly error: boolean;
 }

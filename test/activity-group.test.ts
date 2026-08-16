@@ -109,7 +109,8 @@ test('groups multiple process rows but leaves output and a single process row of
   assert.equal(groups[0]?.partialKey, 'answer')
   assert.equal(groups[0]?.latestKey, 'answer')
   assert.equal(groups[0]?.latestKind, 'reasoning')
-  assert.equal(groups[0]?.count, '2 段思考 · 1 次工具调用')
+  assert.equal(groups[0]?.reasoningCount, 2)
+  assert.equal(groups[0]?.toolCount, 1)
   assert.equal(groups[0]?.running, false)
   assert.equal(activityGroups(['answer'], nodeStore([nodes[2] as ChatNode])).length, 0)
 
@@ -117,7 +118,8 @@ test('groups multiple process rows but leaves output and a single process row of
   const running = activityGroups(['reason', 'nested'], nodeStore([nodes[0] as ChatNode, nested]))[0]
   assert.equal(running?.running, true)
   assert.equal(running?.latestKind, 'tool')
-  assert.equal(running?.count, '1 段思考 · 2 次工具调用')
+  assert.equal(running?.reasoningCount, 1)
+  assert.equal(running?.toolCount, 2)
 })
 
 test('ignores blank reasoning and blank text, but treats visible output as a boundary', () => {
@@ -142,7 +144,8 @@ test('ignores blank reasoning and blank text, but treats visible output as a bou
     ['text-blank', 'single'],
   ])
   assert.equal(groups[0]?.partialKey, 'image')
-  assert.equal(groups[0]?.count, '2 段思考')
+  assert.equal(groups[0]?.reasoningCount, 2)
+  assert.equal(groups[0]?.toolCount, 0)
 })
 
 test('creates separate groups around non-activity nodes and requires two process entries', () => {
@@ -178,7 +181,8 @@ test('marks only the final running reasoning block as active', () => {
   assert.equal(group?.running, true)
   assert.equal(group?.latestKey, 'running')
   assert.equal(group?.latestKind, 'reasoning')
-  assert.equal(group?.count, '2 段思考 · 1 次工具调用')
+  assert.equal(group?.reasoningCount, 2)
+  assert.equal(group?.toolCount, 1)
 })
 
 test('propagates settled tool errors but keeps a running parent active', () => {
@@ -199,7 +203,8 @@ test('propagates settled tool errors but keeps a running parent active', () => {
   ]))[0]
   assert.equal(runningGroup?.running, true)
   assert.equal(runningGroup?.error, false)
-  assert.equal(runningGroup?.count, '1 段思考 · 2 次工具调用')
+  assert.equal(runningGroup?.reasoningCount, 1)
+  assert.equal(runningGroup?.toolCount, 2)
 })
 
 test('counts deeply nested and sibling tool calls', () => {
@@ -213,7 +218,8 @@ test('counts deeply nested and sibling tool calls', () => {
   ] satisfies readonly ChatNode[]
 
   const group = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
-  assert.equal(group?.count, '1 段思考 · 4 次工具调用')
+  assert.equal(group?.reasoningCount, 1)
+  assert.equal(group?.toolCount, 4)
   assert.equal(group?.running, true)
   assert.equal(group?.latestKind, 'tool')
 })

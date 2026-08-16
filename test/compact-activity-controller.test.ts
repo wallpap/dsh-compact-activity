@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { AssistantBlock, ChatNodeStore, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { CompactActivityController } from '../src/client/components/CompactActivityController.tsx'
+import { en, zh } from '../src/client/locales.ts'
 
 let dom: JSDOM | undefined
 let root: Root | undefined
@@ -90,7 +91,7 @@ function store(nodes: readonly ChatNode[]): ChatNodeStore {
   return { get: key => byKey.get(key), values: () => [...nodes] }
 }
 
-function render(nodes: readonly ChatNode[]): HTMLElement {
+function render(nodes: readonly ChatNode[], dictionary: typeof en = en): HTMLElement {
   const container = installDom()
   const flow = document.createElement('div')
   flow.dataset['chatFlow'] = ''
@@ -127,6 +128,12 @@ function render(nodes: readonly ChatNode[]): HTMLElement {
   const snapshot = { chat: { order: nodes.map(node => node.key), nodes: store(nodes) } }
   const props = {
     useSession: (select: (value: typeof snapshot) => unknown) => select(snapshot),
+    t: (key: string, params?: Record<string, unknown>) => {
+      const template = dictionary[key as keyof typeof dictionary] ?? key
+      return params === undefined
+        ? template
+        : template.replace(/\{(\w+)\}/g, (match, name: string) => name in params ? String(params[name]) : match)
+    },
   } as never
   root = createRoot(container)
   act(() => { root?.render(React.createElement(CompactActivityController, props)) })
@@ -146,8 +153,8 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(marker.open, false)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), true)
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), true)
-  assert.match(marker.textContent ?? '', /已完成/)
-  assert.match(marker.textContent ?? '', /2 段思考/)
+  assert.match(marker.textContent ?? '', /Done/)
+  assert.match(marker.textContent ?? '', /2 thoughts/)
 
   marker.open = true
   marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
@@ -159,7 +166,7 @@ test('shows running tool summary and cleans up on unmount', () => {
   const flow = render([
     assistant('reason', [{ kind: 'reasoning', text: '执行' }]),
     tool('run', true),
-  ])
+  ], zh)
   const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
   assert.ok(marker)
   assert.equal(marker.dataset['running'], 'true')
@@ -170,4 +177,10 @@ test('shows running tool summary and cleans up on unmount', () => {
   root = undefined
   assert.equal(flow.querySelector('details[data-dca-activity-group]'), null)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), false)
+})
+
+test('keeps the locale dictionaries bilingual and complete', () => {
+  assert.deepEqual(Object.keys(en).sort(), Object.keys(zh).sort())
+  assert.equal(en['status.running'], 'In progress...')
+  assert.equal(zh['status.running'], '进行中...')
 })

@@ -3,6 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/dsh-compact-activity)](https://www.npmjs.com/package/dsh-compact-activity)
 [![license](https://img.shields.io/npm/l/dsh-compact-activity)](./LICENSE)
 
+简体中文 | [English](./README.en.md)
+
 让 DeepSeek Harness 的思考与工具调用更紧凑、更容易浏览。
 
 插件会把连续的思考和工具调用收进一个单行折叠项。默认保持收起，需要查看细节时再展开；模型最终输出始终正常显示。
@@ -22,6 +24,8 @@
 - **单条消息不受影响**：只有一条思考或工具调用时，继续使用 DSH 官方行为。
 
 插件只调整 Web 界面的展示方式，不修改模型上下文、会话日志或工具执行。
+
+总折叠的状态和计数文案跟随 DSH 的语言设置，支持 `中文` 和 `English`。未设置显式语言时由 DSH 使用浏览器语言；在 DSH 中切换语言后，已显示的总过程项会同步更新。官方工具的标题和摘要仍原样复用。
 
 ## 安装
 
@@ -85,7 +89,7 @@ dsh --profile web --dump-config
 
 ## 使用方式
 
-插件没有设置页面。安装后重启 DSH Web 或 Desktop，插件会自动生效：
+插件没有独立的设置页面。安装后重启 DSH Web 或 Desktop，插件会自动生效；语言由 DSH 的 Language 设置统一控制：
 
 | 场景               | 显示行为                                |
 | ------------------ | --------------------------------------- |
@@ -93,6 +97,7 @@ dsh --profile web --dump-config
 | 正在思考           | 显示 `进行中...`、计数和 `正在思考`     |
 | 正在调用工具       | 显示最后一个官方工具的类型和摘要        |
 | 工作完成           | 显示 `已完成` 和计数，不显示摘要        |
+| 切换 DSH 语言      | 总过程状态和计数同步切换中文或英文      |
 | 展开总过程         | 显示原版 Think 和工具组件，保留官方交互 |
 | 单条过程消息       | 不分组，保持 DSH 官方显示               |
 | 思考后紧接模型正文 | 只折叠 Think，正文继续显示              |
@@ -149,7 +154,7 @@ dsh plugin --profile web remove dsh-compact-activity
 4. 如果版本不一致，运行 `dsh plugin add "dsh-compact-activity@$latest"`，然后重新检查实际版本和配置。
 5. 重启 DSH Desktop，再检查总过程折叠。
 
-`pnpm peers check` 对旧版插件可能报告缺少 React 和 DSH peer dependencies。这些模块由 DSH 宿主提供，不应手动安装到 profile；当前版本已将它们标记为 optional peer。若目标 profile 已包含上述配置但仍无效果，记录 DSH/Desktop 版本、启动方式、npm 最新版本、实际插件版本、安装路径和浏览器控制台错误。不要编辑 profile 清单、复制插件文件或检查 `app.asar`；这些操作会绕过 Desktop 的正常插件加载流程。
+`pnpm peers check` 对旧版插件可能报告缺少 React、DSH Client 或 Locale peer dependencies。这些模块由 DSH 宿主提供，不应手动安装到 profile；当前版本已将它们标记为 optional peer。若目标 profile 已包含上述配置但仍无效果，记录 DSH/Desktop 版本、启动方式、npm 最新版本、实际插件版本、安装路径和浏览器控制台错误。不要编辑 profile 清单、复制插件文件或检查 `app.asar`；这些操作会绕过 Desktop 的正常插件加载流程。
 
 ## 从本地源码安装
 
@@ -195,6 +200,7 @@ src/
 └── client/
     ├── index.ts                     # 注册控制器并管理样式生命周期
     ├── activity-group.ts            # 过程分组、边界、状态和计数
+    ├── locales.ts                   # DSH Locale namespace 的中英文词典
     ├── styles.ts                    # 总折叠行及隐藏状态样式
     └── components/
         └── CompactActivityController.tsx # 控制官方过程行的总折叠状态
@@ -216,11 +222,12 @@ Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 插件依赖以下 DSH Web 扩展点和稳定标记：
 
 - `conversation.session.header.actions`
+- `@deepseek-ai/dsh-client-locale` 的 `locale` service 与 slot `t` 翻译 seat
 - Chat Flow 的 `data-chat-flow` 与 `data-chat-flow-key`
 - 官方过程项的 `data-variant="think"`、`data-tool`、`data-state` 和 `data-disclosure-row`
 - `assistant-step` 与 `tool-call` Chat Node 数据
 
-这些标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互和工具实时摘要。
+语言词典注册到插件自有的 `compact-activity` namespace，状态和计数通过 DSH 注入的 `t` 翻译函数呈现；不读取或猜测 DOM／浏览器语言。其余标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互、语言切换和工具实时摘要。
 
 ### DSH Desktop 服务边界
 

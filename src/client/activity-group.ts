@@ -11,7 +11,8 @@ export interface ActivityGroup {
   /** 最新过程项所在行；进行中时从该行复用官方摘要。 */
   readonly latestKey: string
   readonly latestKind: 'reasoning' | 'tool'
-  readonly count: string
+  readonly reasoningCount: number
+  readonly toolCount: number
   readonly running: boolean
   readonly error: boolean
 }
@@ -74,15 +75,6 @@ function toolEntries(block: ToolCallBlock, rowKey: string): ActivityEntry[] {
   ]
 }
 
-function countSummary(entries: readonly ActivityEntry[]): string {
-  const reasoning = entries.filter(entry => entry.kind === 'reasoning').length
-  const tools = entries.length - reasoning
-  return [
-    reasoning > 0 ? `${reasoning} 段思考` : '',
-    tools > 0 ? `${tools} 次工具调用` : '',
-  ].filter(Boolean).join(' · ')
-}
-
 function groupFrom(
   order: readonly string[],
   store: ChatNodeStore,
@@ -101,13 +93,15 @@ function groupFrom(
   const running = entries.findLast(entry => entry.running)
   const latest = running ?? entries.at(-1)
   if (latest === undefined) throw new Error('activity group requires at least one activity entry')
+  const reasoningCount = entries.filter(entry => entry.kind === 'reasoning').length
   return {
     firstKey: keys[0] ?? '',
     keys,
     ...(partialKey === undefined ? {} : { partialKey }),
     latestKey: latest.rowKey,
     latestKind: latest.kind,
-    count: countSummary(entries),
+    reasoningCount,
+    toolCount: entries.length - reasoningCount,
     running: running !== undefined,
     error: running === undefined && latest.error,
   }

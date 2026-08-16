@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { activityGroups, type ActivityGroup } from '../activity-group.ts'
+import { ACTIVITY_NS } from '../locales.ts'
 
-type ControllerProps = PropsRuntime<'conversation.session.header.actions'>
+type ActivityTranslate = TranslateNS<typeof ACTIVITY_NS>
+type ControllerProps = PropsRuntime<'conversation.session.header.actions'> & { t: ActivityTranslate }
 
 const MARKER_ATTRIBUTE = 'data-dca-activity-group'
 const CHILD_CLASS = 'dca-activity-child'
@@ -37,29 +39,46 @@ function oneLine(value: string | null | undefined): string {
 }
 
 /** 按可视顺序读取官方 DisclosureRow 的类型和折叠摘要。 */
-function officialToolSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup): string {
+function officialToolSummary(
+  rows: ReadonlyMap<string, HTMLElement>,
+  group: ActivityGroup,
+  t: ActivityTranslate,
+): string {
   const row = rows.get(group.latestKey)
   const tools = row === undefined ? [] : [...row.querySelectorAll<HTMLElement>('[data-tool]')]
   const tool = tools.findLast(item => item.dataset['state'] === 'running') ?? tools.at(-1)
   const disclosure = tool?.querySelector<HTMLElement>('[data-disclosure-row]')
-  if (disclosure === null || disclosure === undefined) return '工具执行中'
+  if (disclosure === null || disclosure === undefined) return t('status.toolRunning')
   const parts = [...disclosure.children]
     .slice(1)
     .map(child => oneLine(child.textContent))
     .filter(Boolean)
   const [title, ...summary] = parts
-  if (title === undefined) return '工具执行中'
+  if (title === undefined) return t('status.toolRunning')
   return summary.length === 0 ? title : `${title} · ${summary.join(' ')}`
 }
 
-function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup): string {
+function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup, t: ActivityTranslate): string {
   if (!group.running) return ''
-  return group.latestKind === 'reasoning' ? '正在思考' : officialToolSummary(rows, group)
+  return group.latestKind === 'reasoning' ? t('status.thinking') : officialToolSummary(rows, group, t)
 }
 
-function setMarkerText(marker: HTMLDetailsElement, group: ActivityGroup, summaryText: string): void {
-  const labelText = group.running ? '进行中...' : '已完成'
-  const signature = JSON.stringify([labelText, group.count, summaryText, group.running, group.error])
+function countSummary(group: ActivityGroup, t: ActivityTranslate): string {
+  return [
+    group.reasoningCount > 0 ? t('count.thoughts', { count: group.reasoningCount }) : '',
+    group.toolCount > 0 ? t('count.toolCalls', { count: group.toolCount }) : '',
+  ].filter(Boolean).join(' · ')
+}
+
+function setMarkerText(
+  marker: HTMLDetailsElement,
+  group: ActivityGroup,
+  summaryText: string,
+  t: ActivityTranslate,
+): void {
+  const labelText = t(group.running ? 'status.running' : 'status.done')
+  const countText = countSummary(group, t)
+  const signature = JSON.stringify([labelText, countText, summaryText, group.running, group.error])
   if (marker.dataset['signature'] === signature) return
   marker.dataset['signature'] = signature
   marker.dataset['running'] = String(group.running)
@@ -89,7 +108,7 @@ function setMarkerText(marker: HTMLDetailsElement, group: ActivityGroup, summary
 
   const count = document.createElement('span')
   count.className = 'dca-count'
-  count.textContent = group.count
+  count.textContent = countText
 
   summary.append(arrow, label, countSeparator, count)
   if (summaryText !== '') {
@@ -105,7 +124,7 @@ function setMarkerText(marker: HTMLDetailsElement, group: ActivityGroup, summary
   marker.append(summary)
 }
 
-function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[]): void {
+function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[], t: ActivityTranslate): void {
   const rows = rowsIn(container)
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
   const liveMarkers = new Set(visibleGroups.map(group => group.firstKey))
@@ -135,14 +154,14 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[])
     marker.ontoggle = () => {
       setGroupOpen(rowsIn(container), group, marker.open)
     }
-    setMarkerText(marker, group, liveSummary(rows, group))
+    setMarkerText(marker, group, liveSummary(rows, group, t), t)
     setGroupOpen(rows, group, marker.open)
   }
 }
 
-function sync(groups: readonly ActivityGroup[]): void {
+function sync(groups: readonly ActivityGroup[], t: ActivityTranslate): void {
   for (const container of document.querySelectorAll<HTMLElement>('[data-chat-flow]')) {
-    syncContainer(container, groups)
+    syncContainer(container, groups, t)
   }
 }
 
@@ -158,7 +177,7 @@ function cleanup(): void {
  * 只向 DOM 添加总折叠。官方 DSH 过程行仍是实际内容，因此单条消息和展开后的
  * 子项继续使用官方渲染器、样式及交互。
  */
-export function CompactActivityController({ useSession }: ControllerProps): null {
+export function CompactActivityController({ useSession, t }: ControllerProps): null {
   const chat = useSession(snapshot => snapshot.chat)
   const groups = activityGroups(chat.order, chat.nodes)
   const groupsRef = useRef<readonly ActivityGroup[]>(groups)
@@ -166,9 +185,9 @@ export function CompactActivityController({ useSession }: ControllerProps): null
   const syncRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    syncRef.current = () => { sync(groupsRef.current) }
+    syncRef.current = () => { sync(groupsRef.current, t) }
     syncRef.current()
-  }, [groups])
+  }, [groups, t])
 
   useEffect(() => {
     let queued = false
