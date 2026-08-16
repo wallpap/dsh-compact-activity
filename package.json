@@ -35,7 +35,7 @@
   "scripts": {
     "build": "node scripts/clean.ts && tsc -p tsconfig.build.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/activity-group.test.ts",
+    "test": "tsx --test test/*.test.ts",
     "check": "npm run typecheck && npm run test && npm run build",
     "prepack": "npm run build"
   },
@@ -58,10 +58,15 @@
     "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@types/jsdom": "21.1.7",
     "@types/node": "^24.0.0",
     "@types/react": "~18.3.1",
+    "@types/react-dom": "18.3.0",
+    "jsdom": "26.1.0",
     "react": "^18.3.1",
+    "react-dom": "18.3.1",
     "tsdown": "^0.22.2",
+    "tsx": "4.19.4",
     "typescript": "^6.0.3"
   },
   "license": "MIT",

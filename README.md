@@ -146,6 +146,8 @@ npm pack --dry-run
 
 `npm run check` 会依次执行严格类型检查、测试和生产构建。`prepack` 会在发布或打包前重新生成 `lib/`，避免发布过期构建产物。
 
+测试使用开发依赖 `jsdom`、`react-dom` 和 `tsx`，用于验证核心分组逻辑及浏览器控制器行为。这些依赖不会进入 npm tarball；`npm test` 会自动发现 `test/*.test.ts`。
+
 ```text
 scripts/
 └── clean.ts                         # 使用 Node 原生 TypeScript 清理构建目录
@@ -180,6 +182,12 @@ Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 - `assistant-step` 与 `tool-call` Chat Node 数据
 
 这些标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互和工具实时摘要。
+
+### DSH Desktop 服务边界
+
+本插件是跨环境 Web UI 插件，不执行 profile 切换、插件安装/更新/卸载或依赖修复，因此不使用 Desktop 专用的 `desktopProfiles`、`desktopPnpm`、`desktopRuntime` 或 Electron IPC。Desktop 仍通过普通 DSH Web Client 模块加载本插件；不要为本插件添加 Desktop Host 服务作为必需注入，也不要访问 `app.asar` 或其他 Desktop 私有路径。
+
+Desktop 真实环境验证应使用 Desktop 提供的 DSH Terminal，并确认当前 profile 的配置包含 `id: ui-compact-activity` 和 `name: dsh-compact-activity`。仓库中的 jsdom 测试不能替代真实 Desktop/Web 宿主回归检查。
 
 ## 问题反馈
 
