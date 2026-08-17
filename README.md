@@ -9,13 +9,6 @@
 
 插件会把连续的思考和工具调用收进一个单行折叠项。默认保持收起，需要查看细节时再展开；模型最终输出始终正常显示。
 
-```text
-> 进行中...  [思考图标]×2  [工具图标]×3  Code · 正在读取项目文件...
-> 已完成     [思考图标]×2  [工具图标]×3  [失败图标]×1
-> 执行错误   [思考图标]×2  [工具图标]×3  [失败图标]×1
-```
-
-实际界面使用 DSH 官方思考图标、扳手工具图标和圈叉失败图标；这里用方括号表示图标含义。
 
 ## 为什么使用它
 
@@ -116,15 +109,13 @@ dsh --profile web --dump-config
 
 ## 效果展示
 
-<img width="1185" height="632" alt="image" src="https://github.com/user-attachments/assets/6f3bf6fb-141c-4b32-8d4f-c78095a6927d" />
+<img width="1191" height="886" alt="image" src="https://github.com/user-attachments/assets/b03645eb-fe2e-4c10-a0cc-fdc80d0e93dd" />
 
----
+-----------
 
-<img width="1228" height="299" alt="image" src="https://github.com/user-attachments/assets/90fdc15b-d58d-41f3-954c-68a751fc7ee8" />
+<img width="1190" height="722" alt="image" src="https://github.com/user-attachments/assets/57e2924a-a2eb-4a80-8a03-984173bb0a80" />
 
----
 
-<img width="1034" height="548" alt="image" src="https://github.com/user-attachments/assets/8b3b8d68-59fa-425f-8f2b-ea0d03c6e37d" />
 
 ## 更新与卸载
 
