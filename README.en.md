@@ -195,7 +195,7 @@ npm run build
 npm pack --dry-run
 ```
 
-`npm run check` runs strict type checking, tests, and a production build in order. `prepack` regenerates `lib/` before publishing or packing, so stale build artifacts are never released.
+`npm run check` runs strict type checking, tests, and a production build in order. `lib/` is generated locally and is not tracked by Git; `prepack` rebuilds it before publishing or packing and includes it in the npm package.
 
 Tests use the dev dependencies `jsdom`, `react-dom`, and `tsx` to verify the core grouping logic and browser controller behavior. They never enter the npm tarball; `npm test` auto-discovers `test/*.test.ts`.
 

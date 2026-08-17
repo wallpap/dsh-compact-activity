@@ -1,4 +1,5 @@
 node_modules/
+/lib/
 .vscode/
 *.tgz
 .DS_Store

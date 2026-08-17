@@ -195,7 +195,7 @@ npm run build
 npm pack --dry-run
 ```
 
-`npm run check` 会依次执行严格类型检查、测试和生产构建。`prepack` 会在发布或打包前重新生成 `lib/`，避免发布过期构建产物。
+`npm run check` 会依次执行严格类型检查、测试和生产构建。`lib/` 是本地生成且不纳入 Git 的构建产物；`prepack` 会在发布或打包前重新生成它，并将其包含在 npm 包中。
 
 测试使用开发依赖 `jsdom`、`react-dom` 和 `tsx`，用于验证核心分组逻辑及浏览器控制器行为。这些依赖不会进入 npm tarball；`npm test` 会自动发现 `test/*.test.ts`。
 
