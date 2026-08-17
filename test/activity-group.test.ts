@@ -111,6 +111,11 @@ test('groups multiple process rows but leaves output and a single process row of
   assert.equal(groups[0]?.latestKind, 'reasoning')
   assert.equal(groups[0]?.reasoningCount, 2)
   assert.equal(groups[0]?.toolCount, 1)
+  assert.deepEqual(groups[0]?.members, [
+    { rowKey: 'reason', kind: 'reasoning', state: 'done' },
+    { rowKey: 'read', kind: 'tool', state: 'done' },
+    { rowKey: 'answer', kind: 'reasoning', state: 'done' },
+  ])
   assert.equal(groups[0]?.running, false)
   assert.equal(activityGroups(['answer'], nodeStore([nodes[2] as ChatNode])).length, 0)
 
@@ -183,6 +188,11 @@ test('marks only the final running reasoning block as active', () => {
   assert.equal(group?.latestKind, 'reasoning')
   assert.equal(group?.reasoningCount, 2)
   assert.equal(group?.toolCount, 1)
+  assert.deepEqual(group?.members, [
+    { rowKey: 'running', kind: 'reasoning', state: 'done' },
+    { rowKey: 'running', kind: 'reasoning', state: 'running' },
+    { rowKey: 'done', kind: 'tool', state: 'done' },
+  ])
 })
 
 test('counts failures but only reports an error when the final process item fails', () => {
@@ -205,6 +215,7 @@ test('counts failures but only reports an error when the final process item fail
   assert.equal(recoveredGroup?.error, false)
   assert.equal(recoveredGroup?.failureCount, 1)
   assert.equal(recoveredGroup?.latestKey, 'recovered')
+  assert.deepEqual(recoveredGroup?.members.map(member => member.state), ['done', 'error', 'done'])
 
   const nested = runningTool('parent', 'run_code', [errorTool('child', 'read')])
   const runningGroup = activityGroups(['reason', 'parent'], nodeStore([
@@ -241,6 +252,7 @@ test('treats an interrupted final reasoning block as an execution error', () => 
   assert.equal(group?.failureCount, 1)
   assert.equal(group?.latestKey, 'stopped')
   assert.equal(group?.latestKind, 'reasoning')
+  assert.deepEqual(group?.members.map(member => member.state), ['done', 'error'])
 })
 
 test('keeps a final tool error when the next node is only model output', () => {

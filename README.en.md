@@ -15,11 +15,13 @@ The plugin groups consecutive thinking and tool calls into a single-line collaps
 > Execution error [thought icon]×2  [tool icon]×3  [failure icon]×1
 ```
 
-The actual UI uses monochrome SVG icons; brackets identify their meaning in this text example.
+The actual UI uses DSH's official Think icon, a wrench for tool calls, and a circled X for failures; brackets identify their meaning in this text example.
 
 ## Why use it
 
 - **Less scrolling**: consecutive thinking and tool calls collapse into one item.
+- **Soft panel appearance**: a subtle surface, fine border, and state rail add hierarchy; violet marks running, Miku green marks completion, and red marks execution errors.
+- **Clear expanded ownership**: a neutral process spine connects the summary's flat lower edge to official child rows; consistently rounded child surfaces use pale violet, green, or red for running, completed, or failed states.
 - **Official content unchanged**: expanding still uses DSH's official Think, Code, and tool components.
 - **Message boundaries preserved**: the next model message is never folded into the process list.
 - **Live status**: while running, it shows `In progress...`, counts, and the latest activity summary.
@@ -104,8 +106,9 @@ The plugin has no separate settings page. After installation, restart DSH Web or
 | An earlier step fails and later recovers | Shows `Done` and retains the failed-step count |
 | The final process item ends abnormally | Shows `Execution error` with the same icon-count layout |
 | Model output follows an execution error | The process group remains `Execution error`; model output stays visible |
+| A tool call in the next turn fails independently | Keeps DSH's official standalone error row and does not attach it to the previous process group |
 | Switching the DSH language | Status and counts switch between Chinese and English |
-| Top-level item expanded | Shows the original Think and tool components with official interactions |
+| Top-level item expanded | Connects the original Think and tool components with a process spine and pale per-item state surfaces |
 | Single process message | No grouping; DSH official display is kept |
 | Thinking followed by a model message | Only the Think is collapsed; the message still displays |
 

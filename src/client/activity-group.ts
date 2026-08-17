@@ -1,6 +1,14 @@
 import type { AssistantBlock, ChatNodeStore, ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
+export type ActivityMemberState = 'running' | 'done' | 'error'
+
+export interface ActivityMember {
+  readonly rowKey: string
+  readonly kind: 'reasoning' | 'tool'
+  readonly state: ActivityMemberState
+}
+
 /** 一组连续的 DSH 官方过程行。 */
 export interface ActivityGroup {
   readonly firstKey: string
@@ -15,6 +23,8 @@ export interface ActivityGroup {
   readonly toolCount: number
   /** 过程内失败或中断的思考／工具步骤数。 */
   readonly failureCount: number
+  /** 展开后可见的顶层官方过程项及各自状态；嵌套工具继续使用 DSH 官方层级。 */
+  readonly members: readonly ActivityMember[]
   readonly running: boolean
   /** 仅表示最后一个过程项异常结束；历史失败由 failureCount 保留。 */
   readonly error: boolean
@@ -55,6 +65,11 @@ interface ActivityEntry {
   /** 此项代表所在官方过程行的最终结果。 */
   readonly terminal: boolean
   readonly kind: 'reasoning' | 'tool'
+}
+
+function memberState(entry: ActivityEntry): ActivityMemberState {
+  if (entry.running) return 'running'
+  return entry.error ? 'error' : 'done'
 }
 
 function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
@@ -106,6 +121,9 @@ function groupFrom(
   if (latest === undefined) throw new Error('activity group requires at least one activity entry')
   const reasoningCount = entries.filter(entry => entry.kind === 'reasoning').length
   const failureCount = entries.filter(entry => entry.error).length
+  const members = entries
+    .filter(entry => entry.kind === 'reasoning' || entry.terminal)
+    .map(entry => ({ rowKey: entry.rowKey, kind: entry.kind, state: memberState(entry) }))
   return {
     firstKey: keys[0] ?? '',
     keys,
@@ -115,6 +133,7 @@ function groupFrom(
     reasoningCount,
     toolCount: entries.length - reasoningCount,
     failureCount,
+    members,
     running: running !== undefined,
     error: running === undefined && latest.error,
   }

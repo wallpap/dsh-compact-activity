@@ -155,6 +155,13 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
   assert.ok(marker)
   assert.equal(marker.open, false)
+  assert.ok(marker.querySelector('.dca-state-rail'))
+  const firstMember = flow.querySelector<HTMLElement>('[data-chat-flow-key="reason"] [data-variant="think"]')
+  const lastMember = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"] [data-variant="think"]')
+  assert.equal(firstMember?.dataset['dcaMemberState'], 'done')
+  assert.equal(firstMember?.classList.contains('dca-activity-member-first'), true)
+  assert.equal(lastMember?.dataset['dcaMemberState'], 'done')
+  assert.equal(lastMember?.classList.contains('dca-activity-member-last'), true)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), true)
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), true)
   assert.match(marker.textContent ?? '', /Done/)
@@ -165,6 +172,8 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), false)
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), false)
+  assert.equal(firstMember?.classList.contains('dca-activity-member'), true)
+  assert.equal(lastMember?.classList.contains('dca-activity-member'), true)
 })
 
 test('shows running tool summary and cleans up on unmount', async () => {
@@ -177,12 +186,18 @@ test('shows running tool summary and cleans up on unmount', async () => {
   assert.equal(marker.dataset['running'], 'true')
   assert.match(marker.textContent ?? '', /进行中/)
   assert.match(marker.textContent ?? '', /读取 · 文件/)
+  assert.deepEqual(
+    [...flow.querySelectorAll<HTMLElement>('.dca-activity-member')]
+      .map(member => member.dataset['dcaMemberState']),
+    ['done', 'running'],
+  )
 
   act(() => { root?.unmount() })
   root = undefined
   await new Promise(resolve => setTimeout(resolve, 0))
   assert.equal(flow.querySelector('details[data-dca-activity-group]'), null)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), false)
+  assert.equal(flow.querySelector('.dca-activity-member'), null)
 })
 
 test('announces terminal errors and renders icon counts with accessible labels', () => {
@@ -196,13 +211,19 @@ test('announces terminal errors and renders icon counts with accessible labels',
   assert.match(marker.textContent ?? '', /Execution error/)
   assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.textContent, '×1')
   assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.getAttribute('aria-label'), '1 thought')
-  assert.ok(marker.querySelector('[data-dca-count="reasoning"] svg.dca-count-icon'))
+  const reasoningIcon = marker.querySelector<SVGSVGElement>('[data-dca-count="reasoning"] svg.dca-count-icon')
+  assert.equal(reasoningIcon?.getAttribute('viewBox'), '0 0 14 14')
+  assert.ok(reasoningIcon?.querySelector('path[fill-rule="evenodd"]'))
   assert.equal(marker.querySelector('[data-dca-count="tool"]')?.textContent, '×1')
   assert.equal(marker.querySelector('[data-dca-count="tool"]')?.getAttribute('aria-label'), '1 tool call')
-  assert.ok(marker.querySelector('[data-dca-count="tool"] svg.dca-count-icon'))
+  const toolIcon = marker.querySelector<SVGSVGElement>('[data-dca-count="tool"] svg.dca-count-icon')
+  assert.equal(toolIcon?.getAttribute('viewBox'), '0 0 24 24')
+  assert.equal(toolIcon?.querySelector('circle'), null)
   assert.equal(marker.querySelector('[data-dca-count="failure"]')?.textContent, '×1')
   assert.equal(marker.querySelector('[data-dca-count="failure"]')?.getAttribute('aria-label'), '1 failed step')
-  assert.ok(marker.querySelector('[data-dca-count="failure"] svg.dca-count-icon'))
+  const failureIcon = marker.querySelector<SVGSVGElement>('[data-dca-count="failure"] svg.dca-count-icon')
+  assert.equal(failureIcon?.getAttribute('viewBox'), '0 0 24 24')
+  assert.ok(failureIcon?.querySelector('circle'))
   assert.equal(marker.querySelector('[role="status"]')?.getAttribute('aria-live'), 'polite')
 })
 
@@ -218,6 +239,25 @@ test('shows completed after recovery while retaining the failure count', () => {
   assert.match(marker.textContent ?? '', /Done/)
   assert.equal(marker.querySelector('[data-dca-count="tool"]')?.textContent, '×2')
   assert.equal(marker.querySelector('[data-dca-count="failure"]')?.textContent, '×1')
+  assert.deepEqual(
+    [...flow.querySelectorAll<HTMLElement>('.dca-activity-member')]
+      .map(member => member.dataset['dcaMemberState']),
+    ['done', 'error', 'done'],
+  )
+})
+
+test('uses the official row error state for the child surface', async () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: 'Check' }]),
+    tool('official-error'),
+  ])
+  const toolElement = flow.querySelector<HTMLElement>('[data-chat-flow-key="official-error"] [data-tool]')
+  assert.ok(toolElement)
+  assert.equal(toolElement.dataset['dcaMemberState'], 'done')
+
+  toolElement.dataset['state'] = 'error'
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(toolElement.dataset['dcaMemberState'], 'error')
 })
 
 test('keeps execution error when model output follows the failed final tool', () => {
