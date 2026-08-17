@@ -8,9 +8,6 @@ const PACKAGE_NAME = 'dsh-compact-activity'
  */
 const CLIENT_EXTERNALS = [
   'react',
-  'react/jsx-runtime',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-ui-primitives',
 ] as const
 
 export default defineConfig([

@@ -65,8 +65,12 @@ function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGrou
 
 function countSummary(group: ActivityGroup, t: ActivityTranslate): string {
   return [
-    group.reasoningCount > 0 ? t('count.thoughts', { count: group.reasoningCount }) : '',
-    group.toolCount > 0 ? t('count.toolCalls', { count: group.toolCount }) : '',
+    group.reasoningCount > 0
+      ? t(group.reasoningCount === 1 ? 'count.thought' : 'count.thoughts', { count: group.reasoningCount })
+      : '',
+    group.toolCount > 0
+      ? t(group.toolCount === 1 ? 'count.toolCall' : 'count.toolCalls', { count: group.toolCount })
+      : '',
   ].filter(Boolean).join(' · ')
 }
 
@@ -76,7 +80,7 @@ function setMarkerText(
   summaryText: string,
   t: ActivityTranslate,
 ): void {
-  const labelText = t(group.running ? 'status.running' : 'status.done')
+  const labelText = t(group.running ? 'status.running' : group.error ? 'status.error' : 'status.done')
   const countText = countSummary(group, t)
   const signature = JSON.stringify([labelText, countText, summaryText, group.running, group.error])
   if (marker.dataset['signature'] === signature) return
@@ -97,7 +101,7 @@ function setMarkerText(
   const label = document.createElement('span')
   label.className = 'dca-label'
   label.textContent = labelText
-  if (group.running) {
+  if (group.running || group.error) {
     label.setAttribute('role', 'status')
     label.setAttribute('aria-live', 'polite')
   }
@@ -191,12 +195,13 @@ export function CompactActivityController({ useSession, t }: ControllerProps): n
 
   useEffect(() => {
     let queued = false
+    let active = true
     const schedule = (): void => {
       if (queued) return
       queued = true
       queueMicrotask(() => {
         queued = false
-        syncRef.current()
+        if (active) syncRef.current()
       })
     }
     // ponytail: DSH 当前只通过稳定 DOM 标记暴露跨行分组能力；若官方增加过程组
@@ -204,7 +209,10 @@ export function CompactActivityController({ useSession, t }: ControllerProps): n
     const observer = new MutationObserver(schedule)
     observer.observe(document.body, { childList: true, subtree: true, characterData: true })
     schedule()
-    return () => { observer.disconnect() }
+    return () => {
+      active = false
+      observer.disconnect()
+    }
   }, [])
 
   useEffect(() => cleanup, [])

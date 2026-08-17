@@ -196,6 +196,14 @@ test('propagates settled tool errors but keeps a running parent active', () => {
   assert.equal(errorGroup?.error, true)
   assert.equal(errorGroup?.latestKey, 'failed')
 
+  const recovered = tool('recovered', 'write')
+  const recoveredGroup = activityGroups(
+    ['reason', 'failed', 'recovered'],
+    nodeStore([nodes[0] as ChatNode, failed, recovered]),
+  )[0]
+  assert.equal(recoveredGroup?.error, true)
+  assert.equal(recoveredGroup?.latestKey, 'recovered')
+
   const nested = runningTool('parent', 'run_code', [errorTool('child', 'read')])
   const runningGroup = activityGroups(['reason', 'parent'], nodeStore([
     nodes[0] as ChatNode,

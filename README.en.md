@@ -29,7 +29,7 @@ The top-level disclosure's status and counts follow DSH's language setting, with
 
 ## Installation
 
-### DSH Desktop 2.0.0
+### DSH Desktop 2.0.x
 
 Open the DSH Terminal from the system tray and run, against the current profile:
 
@@ -78,7 +78,7 @@ If your agent can use a terminal, send it the following:
 ```text
 Please install and verify the latest version of dsh-compact-activity.
 
-1. If the target is DSH Desktop 2.0.0, locate and use the DSH Terminal program or launch entry provided by Desktop. Don't use plain PowerShell, CMD, or another terminal instead. If you can't find DSH Terminal, stop and report; don't guess paths.
+1. If the target is DSH Desktop 2.0.x, locate and use the DSH Terminal program or launch entry provided by Desktop. Don't use plain PowerShell, CMD, or another terminal instead. If you can't find DSH Terminal, stop and report; don't guess paths.
 2. In DSH Terminal, prefer running `dsh plugin add dsh-compact-activity@latest`, `dsh --dump-config`, and `pnpm list dsh-compact-activity --depth 0`. These operate on Desktop's current profile; don't add `--profile web`.
 3. Query the npm latest version with `pnpm view dsh-compact-activity dist-tags.latest`. If the installed version differs, run `dsh plugin add "dsh-compact-activity@<queried version>"`; don't hardcode a version.
 4. Use `--profile web` commands only when the target is clearly a plain DSH CLI/Web setup. That path requires `dsh` and `pnpm`; npm can't replace pnpm.
@@ -118,7 +118,7 @@ Overly long live summaries are truncated automatically and never squeeze the lay
 
 ## Updating and uninstalling
 
-Desktop 2.0.0, in the DSH Terminal:
+Desktop 2.0.x, in the DSH Terminal:
 
 ```powershell
 dsh plugin update dsh-compact-activity --latest
@@ -216,6 +216,7 @@ Compatibility status:
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
 | DeepSeek Harness official Web | `0.1.0-rc.6` | Type checking, build, and real UI tests pass |
 | DSH Desktop (Windows) | `2.0.0`, bundled DSH `0.1.0-rc.6` | On-device install, update, config, and UI verification pass |
+| DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.6` | Source compatibility reviewed; real UI not yet verified |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 

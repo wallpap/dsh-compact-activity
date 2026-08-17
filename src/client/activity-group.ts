@@ -103,7 +103,7 @@ function groupFrom(
     reasoningCount,
     toolCount: entries.length - reasoningCount,
     running: running !== undefined,
-    error: running === undefined && latest.error,
+    error: running === undefined && entries.some(entry => entry.error),
   }
 }
 

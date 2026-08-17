@@ -1,6 +1,6 @@
 import type { LocaleDictOf } from '@deepseek-ai/dsh-client-ui-slots';
 export declare const ACTIVITY_NS: "compact-activity";
-export type CompactActivityKey = 'status.running' | 'status.done' | 'status.thinking' | 'status.toolRunning' | 'count.thoughts' | 'count.toolCalls';
+export type CompactActivityKey = 'status.running' | 'status.done' | 'status.error' | 'status.thinking' | 'status.toolRunning' | 'count.thought' | 'count.thoughts' | 'count.toolCall' | 'count.toolCalls';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
         'compact-activity': CompactActivityKey;

@@ -162,7 +162,7 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), false)
 })
 
-test('shows running tool summary and cleans up on unmount', () => {
+test('shows running tool summary and cleans up on unmount', async () => {
   const flow = render([
     assistant('reason', [{ kind: 'reasoning', text: '执行' }]),
     tool('run', true),
@@ -175,8 +175,23 @@ test('shows running tool summary and cleans up on unmount', () => {
 
   act(() => { root?.unmount() })
   root = undefined
+  await new Promise(resolve => setTimeout(resolve, 0))
   assert.equal(flow.querySelector('details[data-dca-activity-group]'), null)
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), false)
+})
+
+test('announces settled errors and uses singular English counts', () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: 'Check' }]),
+    tool('failed', false, true),
+  ])
+  const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
+  assert.ok(marker)
+  assert.equal(marker.dataset['error'], 'true')
+  assert.match(marker.textContent ?? '', /Error/)
+  assert.match(marker.textContent ?? '', /1 thought(?:\s|·)/)
+  assert.match(marker.textContent ?? '', /1 tool call/)
+  assert.equal(marker.querySelector('[role="status"]')?.getAttribute('aria-live'), 'polite')
 })
 
 test('keeps the locale dictionaries bilingual and complete', () => {
