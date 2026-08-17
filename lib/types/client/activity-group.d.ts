@@ -11,7 +11,10 @@ export interface ActivityGroup {
     readonly latestKind: 'reasoning' | 'tool';
     readonly reasoningCount: number;
     readonly toolCount: number;
+    /** 过程内失败或中断的思考／工具步骤数。 */
+    readonly failureCount: number;
     readonly running: boolean;
+    /** 仅表示最后一个过程项异常结束；历史失败由 failureCount 保留。 */
     readonly error: boolean;
 }
 /** 只为至少包含两个过程项的连续列表创建总折叠。 */

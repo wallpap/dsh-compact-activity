@@ -13,7 +13,10 @@ export interface ActivityGroup {
   readonly latestKind: 'reasoning' | 'tool'
   readonly reasoningCount: number
   readonly toolCount: number
+  /** 过程内失败或中断的思考／工具步骤数。 */
+  readonly failureCount: number
   readonly running: boolean
+  /** 仅表示最后一个过程项异常结束；历史失败由 failureCount 保留。 */
   readonly error: boolean
 }
 
@@ -49,29 +52,37 @@ interface ActivityEntry {
   readonly rowKey: string
   readonly running: boolean
   readonly error: boolean
+  /** 此项代表所在官方过程行的最终结果。 */
+  readonly terminal: boolean
   readonly kind: 'reasoning' | 'tool'
 }
 
 function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   const blocks = reasoningBlocks(node.data.blocks)
   const last = blocks.at(-1)
-  return blocks.map(block => ({
-    rowKey: node.key,
-    running: node.data.status === 'running' && block === last && node.data.blocks.at(-1) === block,
-    error: false,
-    kind: 'reasoning',
-  }))
+  return blocks.map(block => {
+    const terminal = block === last
+    const isFinalBlock = terminal && node.data.blocks.at(-1) === block
+    return {
+      rowKey: node.key,
+      running: node.data.status === 'running' && isFinalBlock,
+      error: node.data.status === 'interrupted' && isFinalBlock,
+      terminal,
+      kind: 'reasoning',
+    }
+  })
 }
 
-function toolEntries(block: ToolCallBlock, rowKey: string): ActivityEntry[] {
+function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): ActivityEntry[] {
   return [
     {
       rowKey,
       running: !('kind' in block),
       error: 'kind' in block && block.isError === true,
+      terminal,
       kind: 'tool',
     },
-    ...block.subCalls.flatMap(child => toolEntries(child, rowKey)),
+    ...block.subCalls.flatMap(child => toolEntries(child, rowKey, false)),
   ]
 }
 
@@ -91,9 +102,10 @@ function groupFrom(
   // 父工具可以仍在运行，而其最后一个子工具已经结束。此时应继续显示进行中，
   // 并以最后一个运行项作为实时状态来源；全部结束后才回退到最后一个过程项。
   const running = entries.findLast(entry => entry.running)
-  const latest = running ?? entries.at(-1)
+  const latest = running ?? entries.findLast(entry => entry.terminal)
   if (latest === undefined) throw new Error('activity group requires at least one activity entry')
   const reasoningCount = entries.filter(entry => entry.kind === 'reasoning').length
+  const failureCount = entries.filter(entry => entry.error).length
   return {
     firstKey: keys[0] ?? '',
     keys,
@@ -102,8 +114,9 @@ function groupFrom(
     latestKind: latest.kind,
     reasoningCount,
     toolCount: entries.length - reasoningCount,
+    failureCount,
     running: running !== undefined,
-    error: running === undefined && entries.some(entry => entry.error),
+    error: running === undefined && latest.error,
   }
 }
 

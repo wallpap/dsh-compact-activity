@@ -9,7 +9,7 @@ import { activityGroups } from '../src/client/activity-group.ts'
 function assistant(
   key: string,
   blocks: readonly AssistantBlock[],
-  status: 'running' | 'settled' = 'settled',
+  status: 'running' | 'settled' | 'interrupted' = 'settled',
 ): ChatNode<'assistant-step'> {
   return {
     key,
@@ -185,7 +185,7 @@ test('marks only the final running reasoning block as active', () => {
   assert.equal(group?.toolCount, 1)
 })
 
-test('propagates settled tool errors but keeps a running parent active', () => {
+test('counts failures but only reports an error when the final process item fails', () => {
   const failed = errorResultTool('failed', 'read')
   const nodes = [
     assistant('reason', [{ kind: 'reasoning', text: '检查' }]),
@@ -194,6 +194,7 @@ test('propagates settled tool errors but keeps a running parent active', () => {
   const errorGroup = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
   assert.equal(errorGroup?.running, false)
   assert.equal(errorGroup?.error, true)
+  assert.equal(errorGroup?.failureCount, 1)
   assert.equal(errorGroup?.latestKey, 'failed')
 
   const recovered = tool('recovered', 'write')
@@ -201,7 +202,8 @@ test('propagates settled tool errors but keeps a running parent active', () => {
     ['reason', 'failed', 'recovered'],
     nodeStore([nodes[0] as ChatNode, failed, recovered]),
   )[0]
-  assert.equal(recoveredGroup?.error, true)
+  assert.equal(recoveredGroup?.error, false)
+  assert.equal(recoveredGroup?.failureCount, 1)
   assert.equal(recoveredGroup?.latestKey, 'recovered')
 
   const nested = runningTool('parent', 'run_code', [errorTool('child', 'read')])
@@ -211,8 +213,49 @@ test('propagates settled tool errors but keeps a running parent active', () => {
   ]))[0]
   assert.equal(runningGroup?.running, true)
   assert.equal(runningGroup?.error, false)
+  assert.equal(runningGroup?.failureCount, 1)
   assert.equal(runningGroup?.reasoningCount, 1)
   assert.equal(runningGroup?.toolCount, 2)
+
+  const recoveredParent = {
+    ...tool('parent-done', 'run_code'),
+    data: { root: settledTool('parent-done', 'run_code', [errorTool('failed-child', 'read')]) },
+  } satisfies ChatNode<'tool-call'>
+  const recoveredParentGroup = activityGroups(['reason', 'parent-done'], nodeStore([
+    nodes[0] as ChatNode,
+    recoveredParent,
+  ]))[0]
+  assert.equal(recoveredParentGroup?.error, false)
+  assert.equal(recoveredParentGroup?.failureCount, 1)
+})
+
+test('treats an interrupted final reasoning block as an execution error', () => {
+  const nodes = [
+    assistant('reason', [{ kind: 'reasoning', text: '准备' }]),
+    assistant('stopped', [{ kind: 'reasoning', text: '未完成' }], 'interrupted'),
+  ] satisfies readonly ChatNode[]
+
+  const group = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
+  assert.equal(group?.running, false)
+  assert.equal(group?.error, true)
+  assert.equal(group?.failureCount, 1)
+  assert.equal(group?.latestKey, 'stopped')
+  assert.equal(group?.latestKind, 'reasoning')
+})
+
+test('keeps a final tool error when the next node is only model output', () => {
+  const nodes = [
+    assistant('reason', [{ kind: 'reasoning', text: '准备' }]),
+    errorResultTool('failed', 'read'),
+    assistant('answer', [{ kind: 'text', text: '仍然回复正文' }]),
+  ] satisfies readonly ChatNode[]
+
+  const groups = activityGroups(nodes.map(node => node.key), nodeStore(nodes))
+  assert.equal(groups.length, 1)
+  assert.deepEqual(groups[0]?.keys, ['reason', 'failed'])
+  assert.equal(groups[0]?.error, true)
+  assert.equal(groups[0]?.failureCount, 1)
+  assert.equal(groups[0]?.latestKey, 'failed')
 })
 
 test('counts deeply nested and sibling tool calls', () => {

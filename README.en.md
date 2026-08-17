@@ -10,9 +10,12 @@ Make DeepSeek Harness thinking and tool calls more compact and easier to browse.
 The plugin groups consecutive thinking and tool calls into a single-line collapsible item. It stays collapsed by default; expand it when you need details. The model's final output always displays normally.
 
 ```text
-> In progress...  2 thoughts · 3 tool calls  Code · Reading project files...
-> Done            2 thoughts · 3 tool calls
+> In progress...  [thought icon]×2  [tool icon]×3  Code · Reading project files...
+> Done            [thought icon]×2  [tool icon]×3  [failure icon]×1
+> Execution error [thought icon]×2  [tool icon]×3  [failure icon]×1
 ```
+
+The actual UI uses monochrome SVG icons; brackets identify their meaning in this text example.
 
 ## Why use it
 
@@ -20,7 +23,8 @@ The plugin groups consecutive thinking and tool calls into a single-line collaps
 - **Official content unchanged**: expanding still uses DSH's official Think, Code, and tool components.
 - **Message boundaries preserved**: the next model message is never folded into the process list.
 - **Live status**: while running, it shows `In progress...`, counts, and the latest activity summary.
-- **Clean when done**: on completion it shows only `Done` and counts, with no stale summary.
+- **Failure history retained**: failed process steps have a separate count; a later successful recovery still ends as `Done`.
+- **Accurate terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; later model output does not clear that state.
 - **Single messages unaffected**: with only one thinking or tool call, DSH's official behavior is kept.
 
 The plugin only adjusts the Web UI presentation. It does not modify model context, session logs, or tool execution.
@@ -97,6 +101,9 @@ The plugin has no separate settings page. After installation, restart DSH Web or
 | Thinking in progress | Shows `In progress...`, counts, and `Thinking` |
 | Calling a tool | Shows the last official tool's type and summary |
 | Work finished | Shows `Done` and counts, with no summary |
+| An earlier step fails and later recovers | Shows `Done` and retains the failed-step count |
+| The final process item ends abnormally | Shows `Execution error` with the same icon-count layout |
+| Model output follows an execution error | The process group remains `Execution error`; model output stays visible |
 | Switching the DSH language | Status and counts switch between Chinese and English |
 | Top-level item expanded | Shows the original Think and tool components with official interactions |
 | Single process message | No grouping; DSH official display is kept |

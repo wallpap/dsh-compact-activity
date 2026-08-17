@@ -31,7 +31,11 @@ afterEach(() => {
   dom = undefined
 })
 
-function assistant(key: string, blocks: readonly AssistantBlock[], status: 'running' | 'settled' = 'settled'): ChatNode<'assistant-step'> {
+function assistant(
+  key: string,
+  blocks: readonly AssistantBlock[],
+  status: 'running' | 'settled' | 'interrupted' = 'settled',
+): ChatNode<'assistant-step'> {
   return {
     key,
     id: key,
@@ -154,7 +158,8 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), true)
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), true)
   assert.match(marker.textContent ?? '', /Done/)
-  assert.match(marker.textContent ?? '', /2 thoughts/)
+  assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.textContent, '×2')
+  assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.getAttribute('aria-label'), '2 thoughts')
 
   marker.open = true
   marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
@@ -180,7 +185,7 @@ test('shows running tool summary and cleans up on unmount', async () => {
   assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), false)
 })
 
-test('announces settled errors and uses singular English counts', () => {
+test('announces terminal errors and renders icon counts with accessible labels', () => {
   const flow = render([
     assistant('reason', [{ kind: 'reasoning', text: 'Check' }]),
     tool('failed', false, true),
@@ -188,14 +193,51 @@ test('announces settled errors and uses singular English counts', () => {
   const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
   assert.ok(marker)
   assert.equal(marker.dataset['error'], 'true')
-  assert.match(marker.textContent ?? '', /Error/)
-  assert.match(marker.textContent ?? '', /1 thought(?:\s|·)/)
-  assert.match(marker.textContent ?? '', /1 tool call/)
+  assert.match(marker.textContent ?? '', /Execution error/)
+  assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.textContent, '×1')
+  assert.equal(marker.querySelector('[data-dca-count="reasoning"]')?.getAttribute('aria-label'), '1 thought')
+  assert.ok(marker.querySelector('[data-dca-count="reasoning"] svg.dca-count-icon'))
+  assert.equal(marker.querySelector('[data-dca-count="tool"]')?.textContent, '×1')
+  assert.equal(marker.querySelector('[data-dca-count="tool"]')?.getAttribute('aria-label'), '1 tool call')
+  assert.ok(marker.querySelector('[data-dca-count="tool"] svg.dca-count-icon'))
+  assert.equal(marker.querySelector('[data-dca-count="failure"]')?.textContent, '×1')
+  assert.equal(marker.querySelector('[data-dca-count="failure"]')?.getAttribute('aria-label'), '1 failed step')
+  assert.ok(marker.querySelector('[data-dca-count="failure"] svg.dca-count-icon'))
   assert.equal(marker.querySelector('[role="status"]')?.getAttribute('aria-live'), 'polite')
+})
+
+test('shows completed after recovery while retaining the failure count', () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: 'Check' }]),
+    tool('failed', false, true),
+    tool('recovered'),
+  ])
+  const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
+  assert.ok(marker)
+  assert.equal(marker.dataset['error'], 'false')
+  assert.match(marker.textContent ?? '', /Done/)
+  assert.equal(marker.querySelector('[data-dca-count="tool"]')?.textContent, '×2')
+  assert.equal(marker.querySelector('[data-dca-count="failure"]')?.textContent, '×1')
+})
+
+test('keeps execution error when model output follows the failed final tool', () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: 'Check' }]),
+    tool('failed', false, true),
+    assistant('answer', [{ kind: 'text', text: 'Visible answer' }]),
+  ])
+  const marker = flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]')
+  assert.ok(marker)
+  assert.equal(marker.dataset['error'], 'true')
+  assert.match(marker.textContent ?? '', /Execution error/)
+  assert.equal(flow.querySelector('[data-chat-flow-key="answer"]')?.classList.contains('dca-activity-child'), false)
+  assert.match(flow.querySelector('[data-chat-flow-key="answer"]')?.textContent ?? '', /Visible answer/)
 })
 
 test('keeps the locale dictionaries bilingual and complete', () => {
   assert.deepEqual(Object.keys(en).sort(), Object.keys(zh).sort())
   assert.equal(en['status.running'], 'In progress...')
   assert.equal(zh['status.running'], '进行中...')
+  assert.equal(en['status.error'], 'Execution error')
+  assert.equal(zh['status.error'], '执行错误')
 })

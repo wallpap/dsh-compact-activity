@@ -63,15 +63,59 @@ function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGrou
   return group.latestKind === 'reasoning' ? t('status.thinking') : officialToolSummary(rows, group, t)
 }
 
-function countSummary(group: ActivityGroup, t: ActivityTranslate): string {
-  return [
-    group.reasoningCount > 0
-      ? t(group.reasoningCount === 1 ? 'count.thought' : 'count.thoughts', { count: group.reasoningCount })
-      : '',
-    group.toolCount > 0
-      ? t(group.toolCount === 1 ? 'count.toolCall' : 'count.toolCalls', { count: group.toolCount })
-      : '',
-  ].filter(Boolean).join(' · ')
+type CountKind = 'reasoning' | 'tool' | 'failure'
+
+interface CountItem {
+  readonly kind: CountKind
+  readonly count: number
+  readonly label: string
+}
+
+const COUNT_ICON_MARKUP: Readonly<Record<CountKind, string>> = {
+  reasoning: '<path d="M2.2 6.4a4.6 4.6 0 1 1 2.1 3.85L2 11l.75-2.1A4.55 4.55 0 0 1 2.2 6.4Z"/><path d="M4.7 6.5h.01M7 6.5h.01M9.3 6.5h.01"/>',
+  tool: '<circle cx="7" cy="7" r="2.1"/><path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M3.1 3.1l.85.85M10.05 10.05l.85.85M10.9 3.1l-.85.85M3.95 10.05l-.85.85"/>',
+  failure: '<circle cx="7" cy="7" r="5.25"/><path d="M7 4.2v3.4M7 9.8h.01"/>',
+}
+
+function countItems(group: ActivityGroup, t: ActivityTranslate): readonly CountItem[] {
+  const items: CountItem[] = []
+  if (group.reasoningCount > 0) {
+    items.push({
+      kind: 'reasoning',
+      count: group.reasoningCount,
+      label: t(group.reasoningCount === 1 ? 'count.thought' : 'count.thoughts', { count: group.reasoningCount }),
+    })
+  }
+  if (group.toolCount > 0) {
+    items.push({
+      kind: 'tool',
+      count: group.toolCount,
+      label: t(group.toolCount === 1 ? 'count.toolCall' : 'count.toolCalls', { count: group.toolCount }),
+    })
+  }
+  if (group.failureCount > 0) {
+    items.push({
+      kind: 'failure',
+      count: group.failureCount,
+      label: t(group.failureCount === 1 ? 'count.failure' : 'count.failures', { count: group.failureCount }),
+    })
+  }
+  return items
+}
+
+function countIcon(kind: CountKind): SVGSVGElement {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  icon.classList.add('dca-count-icon')
+  icon.setAttribute('viewBox', '0 0 14 14')
+  icon.setAttribute('fill', 'none')
+  icon.setAttribute('stroke', 'currentColor')
+  icon.setAttribute('stroke-width', '1.25')
+  icon.setAttribute('stroke-linecap', 'round')
+  icon.setAttribute('stroke-linejoin', 'round')
+  icon.setAttribute('aria-hidden', 'true')
+  icon.setAttribute('focusable', 'false')
+  icon.innerHTML = COUNT_ICON_MARKUP[kind]
+  return icon
 }
 
 function setMarkerText(
@@ -81,8 +125,8 @@ function setMarkerText(
   t: ActivityTranslate,
 ): void {
   const labelText = t(group.running ? 'status.running' : group.error ? 'status.error' : 'status.done')
-  const countText = countSummary(group, t)
-  const signature = JSON.stringify([labelText, countText, summaryText, group.running, group.error])
+  const counts = countItems(group, t)
+  const signature = JSON.stringify([labelText, counts, summaryText, group.running, group.error])
   if (marker.dataset['signature'] === signature) return
   marker.dataset['signature'] = signature
   marker.dataset['running'] = String(group.running)
@@ -112,7 +156,18 @@ function setMarkerText(
 
   const count = document.createElement('span')
   count.className = 'dca-count'
-  count.textContent = countText
+  for (const item of counts) {
+    const countItem = document.createElement('span')
+    countItem.className = 'dca-count-item'
+    countItem.dataset['dcaCount'] = item.kind
+    countItem.setAttribute('aria-label', item.label)
+
+    const value = document.createElement('span')
+    value.setAttribute('aria-hidden', 'true')
+    value.textContent = `×${item.count}`
+    countItem.append(countIcon(item.kind), value)
+    count.append(countItem)
+  }
 
   summary.append(arrow, label, countSeparator, count)
   if (summaryText !== '') {

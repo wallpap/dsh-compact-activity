@@ -113,15 +113,35 @@ export const STYLE_TEXT = String.raw`
 .dca-count {
   position: relative;
   z-index: 1;
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 14px;
   line-height: 24px;
   white-space: nowrap;
 }
 
+.dca-count-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dca-count-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.dca-count-item[data-dca-count='failure'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .dca-activity-group[data-error='true'] .dca-label,
-.dca-activity-group[data-error='true'] .dca-count,
 .dca-activity-group[data-error='true'] .dca-summary {
   color: var(--dsw-alias-state-error-primary);
 }
