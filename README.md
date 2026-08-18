@@ -118,11 +118,12 @@ dsh --profile web --dump-config
 
 ----------
 
-<img width="1191" height="886" alt="image" src="https://github.com/user-attachments/assets/b03645eb-fe2e-4c10-a0cc-fdc80d0e93dd" />
+<img width="1176" height="604" alt="image" src="https://github.com/user-attachments/assets/8ecbd9f3-696b-40db-8532-e255dc0ae4e4" />
 
 -----------
 
-<img width="1190" height="722" alt="image" src="https://github.com/user-attachments/assets/57e2924a-a2eb-4a80-8a03-984173bb0a80" />
+<img width="1149" height="603" alt="image" src="https://github.com/user-attachments/assets/a9fcdba8-c72c-4b79-9171-225b9a2f1e3a" />
+
 
 
 
