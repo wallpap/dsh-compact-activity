@@ -19,6 +19,7 @@ The plugin groups consecutive thinking and tool calls into a single-line collaps
 - **Live status**: while running, it shows `In progress...`, counts, and the latest activity summary.
 - **Failure history retained**: failed process steps have a separate count; a later successful recovery still ends as `Done`.
 - **Accurate terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; later model output does not clear that state.
+- **Counts terminal failures**: non-zero exit codes and terminating signals from PWSH, Bash, and similar terminal tools count as failed steps even when DSH keeps `isError` set to `false`.
 - **Single messages unaffected**: with only one thinking or tool call, DSH's official behavior is kept.
 
 The plugin only adjusts the Web UI presentation. It does not modify model context, session logs, or tool execution.
@@ -220,9 +221,8 @@ Compatibility status:
 
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness official Web | `0.1.0-rc.6` | Type checking, build, and real UI tests pass |
-| DSH Desktop (Windows) | `2.0.0`, bundled DSH `0.1.0-rc.6` | On-device install, update, config, and UI verification pass |
-| DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.6` | Source compatibility reviewed; real UI not yet verified |
+| DeepSeek Harness official Web | `master`, commit `99f6f02` (release line `0.1.0-rc.7`) | Stable markers and extension points reviewed |
+| DSH Desktop (Windows) | `2.0.0`, bundled DSH `0.1.0-rc.6` | Local profile install and core real-UI interactions verified |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 
@@ -234,7 +234,7 @@ The plugin relies on the following DSH Web extension points and stable markers:
 - The official process items' `data-variant="think"`, `data-tool`, `data-state`, and `data-disclosure-row`
 - `assistant-step` and `tool-call` Chat Node data
 
-The dictionaries register in the plugin-owned `compact-activity` namespace, and statuses and counts render through DSH's injected `t` translator; the plugin does not read or guess DOM/browser languages. The other markers are provided by DSH and are not a public API controlled by this plugin. After upgrading DSH, manually check top-level grouping, official sub-item interactions, language switching, and live tool summaries.
+The dictionaries register in the plugin-owned `compact-activity` namespace, and statuses and counts render through DSH's injected `t` translator; the other markers are provided by DSH and are not a public API controlled by this plugin. After upgrading DSH, manually check top-level grouping, official sub-item interactions, language switching, and live tool summaries.
 
 ### DSH Desktop service boundary
 

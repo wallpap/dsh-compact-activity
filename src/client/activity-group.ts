@@ -89,11 +89,15 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
 }
 
 function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): ActivityEntry[] {
+  const failed = 'kind' in block && (block.isError
+    || (block.resultView?.card === 'terminal'
+      && ((block.resultView.exitCode !== undefined && block.resultView.exitCode !== 0)
+        || block.resultView.signal !== undefined)))
   return [
     {
       rowKey,
       running: !('kind' in block),
-      error: 'kind' in block && block.isError === true,
+      error: failed,
       terminal,
       kind: 'tool',
     },

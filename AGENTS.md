@@ -12,6 +12,7 @@
 - `src/index.ts` 是 Host 入口，保持无副作用的 `apply()`；不要在 Host 入口访问 DOM、React 或浏览器全局对象。
 - `src/client/index.ts` 是浏览器入口，只通过 DSH 的 `ClientContext`、slot 和 effect 注册插件行为。
 - `src/client/activity-group.ts` 负责纯的过程分组、边界判定、状态和计数；可测试逻辑优先放在这里，不把 DOM 细节混入其中。
+- `src/client/activity-group.ts` 的工具失败判定同时考虑 `isError`、终端 `resultView.exitCode !== 0` 和 `resultView.signal`；不要只依赖 DSH 的 `isError`。
 - `src/client/components/CompactActivityController.tsx` 只负责总折叠控制和 DOM 同步；展开后必须继续使用 DSH 官方 Think、工具组件和交互。
 - `src/client/styles.ts` 只提供插件自己的样式。不要覆盖官方过程行的基础样式或复制官方渲染器。
 - `cordis.patch.yml` 负责插件声明的安装补丁；保持 `id: ui-compact-activity` 与包名一致。

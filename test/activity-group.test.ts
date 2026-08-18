@@ -63,6 +63,13 @@ function errorResultTool(key: string, name: string): ChatNode<'tool-call'> {
   }
 }
 
+function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'tool-call'> {
+  return {
+    ...tool(key, name),
+    data: { root: { ...settledTool(key, name), resultView: { card: 'terminal', exitCode } } },
+  }
+}
+
 function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
   const root: RunningToolCall = {
     callId: key,
@@ -268,6 +275,18 @@ test('keeps a final tool error when the next node is only model output', () => {
   assert.equal(groups[0]?.error, true)
   assert.equal(groups[0]?.failureCount, 1)
   assert.equal(groups[0]?.latestKey, 'failed')
+})
+
+test('counts nonzero terminal exits as tool failures', () => {
+  const nodes = [
+    assistant('reason', [{ kind: 'reasoning', text: '执行命令' }]),
+    failedTerminalTool('pwsh', 'pwsh', 1),
+  ] satisfies readonly ChatNode[]
+
+  const group = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
+  assert.equal(group?.failureCount, 1)
+  assert.equal(group?.error, true)
+  assert.deepEqual(group?.members.map(member => member.state), ['done', 'error'])
 })
 
 test('counts deeply nested and sibling tool calls', () => {
