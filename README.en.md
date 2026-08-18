@@ -9,14 +9,6 @@ Make DeepSeek Harness thinking and tool calls more compact and easier to browse.
 
 The plugin groups consecutive thinking and tool calls into a single-line collapsible item. It stays collapsed by default; expand it when you need details. The model's final output always displays normally.
 
-```text
-> In progress...  [thought icon]×2  [tool icon]×3  Code · Reading project files...
-> Done            [thought icon]×2  [tool icon]×3  [failure icon]×1
-> Execution error [thought icon]×2  [tool icon]×3  [failure icon]×1
-```
-
-The actual UI uses DSH's official Think icon, a wrench for tool calls, and a circled X for failures; brackets identify their meaning in this text example.
-
 ## Why use it
 
 - **Less scrolling**: consecutive thinking and tool calls collapse into one item.
@@ -116,15 +108,11 @@ Overly long live summaries are truncated automatically and never squeeze the lay
 
 ## Screenshots
 
-<img width="1263" height="810" alt="image" src="https://github.com/user-attachments/assets/444d9b55-dca7-4d61-82ed-aab6bddf95ff" />
+<img width="1191" height="886" alt="image" src="https://github.com/user-attachments/assets/b03645eb-fe2e-4c10-a0cc-fdc80d0e93dd" />
 
----
+-----------
 
-<img width="1228" height="299" alt="image" src="https://github.com/user-attachments/assets/90fdc15b-d58d-41f3-954c-68a751fc7ee8" />
-
----
-
-<img width="1034" height="548" alt="image" src="https://github.com/user-attachments/assets/8b3b8d68-59fa-425f-8f2b-ea0d03c6e37d" />
+<img width="1190" height="722" alt="image" src="https://github.com/user-attachments/assets/57e2924a-a2eb-4a80-8a03-984173bb0a80" />
 
 ## Updating and uninstalling
 
