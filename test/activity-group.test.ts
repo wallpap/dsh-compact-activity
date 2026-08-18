@@ -99,7 +99,7 @@ function nodeStore(nodes: readonly ChatNode[]): ChatNodeStore {
   return { get: key => byKey.get(key), values: () => values }
 }
 
-test('groups multiple process rows but leaves output and a single process row official', () => {
+test('groups single process rows and preserves mixed assistant output', () => {
   const nodes = [
     assistant('reason', [{ kind: 'reasoning', text: '检查目录' }]),
     tool('read', 'read'),
@@ -111,7 +111,7 @@ test('groups multiple process rows but leaves output and a single process row of
   ] satisfies readonly ChatNode[]
   const groups = activityGroups(nodes.map(node => node.key), nodeStore(nodes))
 
-  assert.equal(groups.length, 1)
+  assert.equal(groups.length, 2)
   assert.deepEqual(groups[0]?.keys, ['reason', 'read', 'answer'])
   assert.equal(groups[0]?.partialKey, 'answer')
   assert.equal(groups[0]?.latestKey, 'answer')
@@ -124,7 +124,13 @@ test('groups multiple process rows but leaves output and a single process row of
     { rowKey: 'answer', kind: 'reasoning', state: 'done' },
   ])
   assert.equal(groups[0]?.running, false)
-  assert.equal(activityGroups(['answer'], nodeStore([nodes[2] as ChatNode])).length, 0)
+  assert.deepEqual(groups[1]?.keys, ['single'])
+  assert.equal(groups[1]?.toolCount, 1)
+
+  const partial = activityGroups(['answer'], nodeStore([nodes[2] as ChatNode]))[0]
+  assert.deepEqual(partial?.keys, ['answer'])
+  assert.equal(partial?.partialKey, 'answer')
+  assert.equal(partial?.reasoningCount, 1)
 
   const nested = runningTool('nested', 'run_code', [settledTool('child', 'read')])
   const running = activityGroups(['reason', 'nested'], nodeStore([nodes[0] as ChatNode, nested]))[0]
@@ -160,7 +166,7 @@ test('ignores blank reasoning and blank text, but treats visible output as a bou
   assert.equal(groups[0]?.toolCount, 0)
 })
 
-test('creates separate groups around non-activity nodes and requires two process entries', () => {
+test('creates separate groups around non-activity nodes', () => {
   const nodes = [
     assistant('first', [{ kind: 'reasoning', text: '一' }]),
     tool('first-tool', 'read'),

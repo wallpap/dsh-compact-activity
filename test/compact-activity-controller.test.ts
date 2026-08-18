@@ -176,6 +176,21 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(lastMember?.classList.contains('dca-activity-member'), true)
 })
 
+test('collapses a single thought and a single tool call', () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: '检查' }]),
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+    tool('read'),
+  ])
+  const markers = flow.querySelectorAll<HTMLDetailsElement>('details[data-dca-activity-group]')
+  assert.equal(markers.length, 2)
+  assert.equal(markers[0]?.querySelector('[data-dca-count="reasoning"]')?.textContent, '×1')
+  assert.equal(markers[1]?.querySelector('[data-dca-count="tool"]')?.textContent, '×1')
+  assert.equal(flow.querySelector('[data-chat-flow-key="reason"]')?.classList.contains('dca-activity-child'), true)
+  assert.equal(flow.querySelector('[data-chat-flow-key="read"]')?.classList.contains('dca-activity-child'), true)
+  assert.match(flow.querySelector('[data-chat-flow-key="answer"]')?.textContent ?? '', /正文/)
+})
+
 test('shows running tool summary and cleans up on unmount', async () => {
   const flow = render([
     assistant('reason', [{ kind: 'reasoning', text: '执行' }]),

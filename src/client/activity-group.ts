@@ -30,8 +30,6 @@ export interface ActivityGroup {
   readonly error: boolean
 }
 
-type ActivityNode = ChatNode<'assistant-step' | 'tool-call'>
-
 function nodeAt(store: ChatNodeStore, key: string): ChatNode | undefined {
   return store.get(key) as ChatNode | undefined
 }
@@ -51,11 +49,17 @@ function hasAssistantOutput(blocks: readonly AssistantBlock[]): boolean {
 }
 
 /** 纯思考消息才是完整过程行；含正文的混合消息保留官方整行渲染。 */
-function isActivityNode(node: ChatNode | undefined): node is ActivityNode {
+function isActivityNode(node: ChatNode | undefined): boolean {
   if (node?.kind === 'tool-call') return true
   return node?.kind === 'assistant-step'
     && reasoningBlocks(node.data.blocks).length > 0
     && !hasAssistantOutput(node.data.blocks)
+}
+
+function isPartialActivityNode(node: ChatNode | undefined): node is ChatNode<'assistant-step'> {
+  return node?.kind === 'assistant-step'
+    && reasoningBlocks(node.data.blocks).length > 0
+    && hasAssistantOutput(node.data.blocks)
 }
 
 interface ActivityEntry {
@@ -143,12 +147,14 @@ function groupFrom(
   }
 }
 
-/** 只为至少包含两个过程项的连续列表创建总折叠。 */
+/** 为连续过程项创建总折叠，单个思考或工具调用也包含在内。 */
 export function activityGroups(order: readonly string[], store: ChatNodeStore): readonly ActivityGroup[] {
   const groups: ActivityGroup[] = []
   let index = 0
   while (index < order.length) {
-    if (!isActivityNode(nodeAt(store, order[index] ?? ''))) {
+    const current = nodeAt(store, order[index] ?? '')
+    if (!isActivityNode(current)) {
+      if (isPartialActivityNode(current)) groups.push(groupFrom(order, store, index, index, current.key))
       index++
       continue
     }
@@ -157,15 +163,9 @@ export function activityGroups(order: readonly string[], store: ChatNodeStore): 
     const boundary = nodeAt(store, order[index] ?? '')
     // 最后一条 assistant 可能先完成思考再输出正文。它的思考仍属于前一过程列表，
     // 但正文必须留在总折叠之外，因此记录为 partialKey，而不是吞掉整行。
-    const partialNode = boundary?.kind === 'assistant-step'
-      && hasAssistantOutput(boundary.data.blocks)
-      && reasoningBlocks(boundary.data.blocks).length > 0
-      ? boundary
-      : undefined
+    const partialNode = isPartialActivityNode(boundary) ? boundary : undefined
     const partialKey = partialNode?.key
-    const processCount = index - start
-      + (partialNode === undefined ? 0 : reasoningBlocks(partialNode.data.blocks).length)
-    if (processCount >= 2) groups.push(groupFrom(order, store, start, index, partialKey))
+    groups.push(groupFrom(order, store, start, index, partialKey))
     if (partialKey !== undefined) index++
   }
   return groups

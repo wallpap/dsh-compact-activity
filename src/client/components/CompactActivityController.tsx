@@ -305,8 +305,8 @@ function cleanup(): void {
 }
 
 /**
- * 只向 DOM 添加总折叠。官方 DSH 过程行仍是实际内容，因此单条消息和展开后的
- * 子项继续使用官方渲染器、样式及交互。
+ * 只向 DOM 添加总折叠。官方 DSH 过程行仍是实际内容，展开后的子项继续使用
+ * 官方渲染器、样式及交互。
  */
 export function CompactActivityController({ useSession, t }: ControllerProps): null {
   const chat = useSession(snapshot => snapshot.chat)

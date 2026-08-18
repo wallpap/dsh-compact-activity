@@ -20,7 +20,7 @@ The plugin groups consecutive thinking and tool calls into a single-line collaps
 - **Failure history retained**: failed process steps have a separate count; a later successful recovery still ends as `Done`.
 - **Accurate terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; later model output does not clear that state.
 - **Counts terminal failures**: non-zero exit codes and terminating signals from PWSH, Bash, and similar terminal tools count as failed steps even when DSH keeps `isError` set to `false`.
-- **Single messages unaffected**: with only one thinking or tool call, DSH's official behavior is kept.
+- **Single activities collapse too**: one thinking item or tool call is also placed in a collapsed top-level item.
 
 The plugin only adjusts the Web UI presentation. It does not modify model context, session logs, or tool execution.
 
@@ -102,7 +102,7 @@ The plugin has no separate settings page. After installation, restart DSH Web or
 | A tool call in the next turn fails independently | Keeps DSH's official standalone error row and does not attach it to the previous process group |
 | Switching the DSH language | Status and counts switch between Chinese and English |
 | Top-level item expanded | Connects the original Think and tool components with a process spine and pale per-item state surfaces |
-| Single process message | No grouping; DSH official display is kept |
+| Single process message | Placed in one collapsed top-level process item |
 | Thinking followed by a model message | Only the Think is collapsed; the message still displays |
 
 Overly long live summaries are truncated automatically and never squeeze the layout.
