@@ -222,7 +222,7 @@ Compatibility status:
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
 | DeepSeek Harness official Web | `master`, commit `99f6f02` (release line `0.1.0-rc.7`) | Stable markers and extension points reviewed |
-| DSH Desktop (Windows) | `2.0.0`, bundled DSH `0.1.0-rc.6` | Local profile install and core real-UI interactions verified |
+| DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.7` | Local profile install and real-UI verification passed |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 
