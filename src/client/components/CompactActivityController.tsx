@@ -20,6 +20,7 @@ interface MemberElement {
   readonly state: ActivityMemberState
 }
 
+/** 宿主 DOM 的实时状态优先，避免快照尚未刷新时将官方错误／停止状态覆盖为完成。 */
 function resolvedMemberState(element: HTMLElement, state: ActivityMemberState): ActivityMemberState {
   const official = element.dataset['state']
   if (state === 'error' || official === 'error' || official === 'stopped') return 'error'
@@ -37,6 +38,10 @@ function markerIn(container: HTMLElement, firstKey: string): HTMLDetailsElement 
     .find(marker => marker.dataset['dcaActivityGroup'] === firstKey) ?? null
 }
 
+/**
+ * 同一 assistant 行可有多个 Think，按 DSH 的 DOM 顺序与分组条目一一对应。
+ * 工具行只取根 [data-tool]，因为嵌套调用仍由官方工具组件在该根行内部展示。
+ */
 function memberElementsIn(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup): MemberElement[] {
   const result: MemberElement[] = []
   for (const key of group.keys) {
@@ -78,6 +83,7 @@ function syncGroupMembers(
   }
 }
 
+/** 混合正文行只能折叠 Think 子项；其余过程行可整体隐藏。 */
 function setGroupOpen(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup, open: boolean): void {
   for (const key of group.keys) {
     const row = rows.get(key)
@@ -188,6 +194,8 @@ function setMarkerText(
   const labelText = t(group.running ? 'status.running' : group.error ? 'status.error' : 'status.done')
   const counts = countItems(group, t)
   const signature = JSON.stringify([labelText, counts, summaryText, group.running, group.error])
+  // MutationObserver 会因官方行的内部更新频繁触发；内容未变时保留 summary，
+  // 以免无意义地重建节点并打断焦点或原生 details 状态。
   if (marker.dataset['signature'] === signature) return
   marker.dataset['signature'] = signature
   marker.dataset['running'] = String(group.running)
@@ -253,6 +261,7 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
   const liveMarkers = new Set(visibleGroups.map(group => group.firstKey))
   const liveMembers = new Set<HTMLElement>()
 
+  // 宿主可能复用或移除行。先撤销上一轮标记，避免过期分组继续隐藏新内容。
   for (const row of rows.values()) {
     row.classList.remove(CHILD_CLASS)
     for (const reasoning of row.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
@@ -288,6 +297,7 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
 }
 
 function sync(groups: readonly ActivityGroup[], t: ActivityTranslate): void {
+  // 页面可以同时保留多个会话流；每个流按自己的可见行独立同步。
   for (const container of document.querySelectorAll<HTMLElement>('[data-chat-flow]')) {
     syncContainer(container, groups, t)
   }
@@ -316,6 +326,7 @@ export function CompactActivityController({ useSession, t }: ControllerProps): n
   const syncRef = useRef<() => void>(() => {})
 
   useEffect(() => {
+    // 观察器在初次挂载后长期存在，通过 ref 始终读取最新的会话快照和翻译函数。
     syncRef.current = () => { sync(groupsRef.current, t) }
     syncRef.current()
   }, [groups, t])

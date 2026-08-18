@@ -24,6 +24,7 @@ function assistant(
 }
 
 function settledTool(callId: string, name: string, subCalls: readonly ToolCallBlock[] = []): ToolResultNode {
+  // 保持夹具最小；subCalls 专门用于验证生产代码的递归计数语义。
   return {
     kind: 'tool-result',
     seq: 0,
@@ -64,6 +65,7 @@ function errorResultTool(key: string, name: string): ChatNode<'tool-call'> {
 }
 
 function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'tool-call'> {
+  // 模拟 DSH 未设置 isError、但终端进程已非零退出的情况。
   return {
     ...tool(key, name),
     data: { root: { ...settledTool(key, name), resultView: { card: 'terminal', exitCode } } },
@@ -71,6 +73,7 @@ function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'
 }
 
 function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
+  // RunningToolCall 没有 kind，这是 activity-group 区分运行中与已完成调用的依据。
   const root: RunningToolCall = {
     callId: key,
     name,

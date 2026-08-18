@@ -1,6 +1,9 @@
 export const STYLE_ID = 'dsh-compact-activity'
 
-/** 仅定义 Codex 风格的总折叠；展开后的 DSH 官方过程行沿用原样式。 */
+/**
+ * 仅定义插件添加的总折叠和成员标记；展开后的 DSH 官方过程行沿用原样式。
+ * 前两条规则只负责隐藏，实际展开状态仍由原生 <details> 与控制器同步。
+ */
 export const STYLE_TEXT = String.raw`
 .dca-activity-child,
 .dca-activity-reasoning-child {

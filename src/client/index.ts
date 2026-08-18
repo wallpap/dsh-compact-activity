@@ -17,7 +17,8 @@ export function apply(ctx: ClientContext): void {
     return () => { style.remove() }
   }, 'dsh-compact-activity: styles')
 
-  // 只附加总折叠控制器，不覆盖官方 assistant 或 Tool 渲染器。
+  // 以 Header slot 作为持久的 React 生命周期挂载点；控制器自身不输出 Header 内容，
+  // 只附加总折叠标记，不覆盖官方 assistant 或 Tool 渲染器。
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
     id: 'dsh-compact-activity-controller',

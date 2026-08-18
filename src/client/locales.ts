@@ -15,6 +15,7 @@ export type CompactActivityKey =
   | 'count.failure'
   | 'count.failures'
 
+/** 将插件私有文案键并入 slot 的类型注册表，使 t(...) 只能使用已声明的键。 */
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     'compact-activity': CompactActivityKey

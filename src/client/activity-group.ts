@@ -34,6 +34,7 @@ function nodeAt(store: ChatNodeStore, key: string): ChatNode | undefined {
   return store.get(key) as ChatNode | undefined
 }
 
+/** 空白思考在官方 UI 中没有可展示的过程内容，不能单独形成过程组。 */
 function reasoningBlocks(blocks: readonly AssistantBlock[]): readonly Extract<AssistantBlock, { kind: 'reasoning' }>[] {
   return blocks.filter(
     (block): block is Extract<AssistantBlock, { kind: 'reasoning' }> =>
@@ -76,6 +77,10 @@ function memberState(entry: ActivityEntry): ActivityMemberState {
   return entry.error ? 'error' : 'done'
 }
 
+/**
+ * assistant 的状态属于整行；只有最后一个思考块能继承进行中／中断状态。
+ * 更早的思考块已经结束，否则同一行会错误地出现多个进行中成员。
+ */
 function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   const blocks = reasoningBlocks(node.data.blocks)
   const last = blocks.at(-1)
@@ -92,6 +97,10 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   })
 }
 
+/**
+ * 已完成的工具结果才带 kind。终端工具即使没有设置 isError，也可能以非零
+ * exitCode 或 signal 失败。子调用参与计数，但只有根调用对应一条顶层官方过程行。
+ */
 function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): ActivityEntry[] {
   const failed = 'kind' in block && (block.isError
     || (block.resultView?.card === 'terminal'
@@ -109,6 +118,7 @@ function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): Act
   ]
 }
 
+/** 将连续过程行（以及可选的正文边界行）转换为一个可渲染的总折叠。 */
 function groupFrom(
   order: readonly string[],
   store: ChatNodeStore,
@@ -154,6 +164,7 @@ export function activityGroups(order: readonly string[], store: ChatNodeStore): 
   while (index < order.length) {
     const current = nodeAt(store, order[index] ?? '')
     if (!isActivityNode(current)) {
+      // 混合 assistant 行可独立出现；此时只隐藏其中的 Think，不隐藏正文。
       if (isPartialActivityNode(current)) groups.push(groupFrom(order, store, index, index, current.key))
       index++
       continue

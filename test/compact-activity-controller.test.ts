@@ -12,6 +12,7 @@ let dom: JSDOM | undefined
 let root: Root | undefined
 
 function installDom(): HTMLElement {
+  // jsdom 不会自动暴露控制器依赖的浏览器全局对象，测试仅安装这几个 API。
   dom = new JSDOM('<!doctype html><body><div id="root"></div></body>')
   Object.assign(globalThis, {
     window: dom.window,
@@ -129,6 +130,7 @@ function render(nodes: readonly ChatNode[], dictionary: typeof en = en): HTMLEle
   }
   document.body.append(flow)
 
+  // 夹具只复现插件依赖的稳定 DSH DOM 标记，不复制官方过程行的渲染实现。
   const snapshot = { chat: { order: nodes.map(node => node.key), nodes: store(nodes) } }
   const props = {
     useSession: (select: (value: typeof snapshot) => unknown) => select(snapshot),
