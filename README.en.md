@@ -221,8 +221,10 @@ Compatibility status:
 
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness official Web | `master`, commit `99f6f02` (release line `0.1.0-rc.7`) | Stable markers and extension points reviewed |
+| DeepSeek Harness official Web | `0.1.0-rc.8` client packages | Dependency declarations, exports, and stable markers reviewed |
 | DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.7` | Local profile install and real-UI verification passed |
+
+`0.1.0-rc.8` compatibility audit (2026-08-20): all four client packages used by the plugin were compared between `rc.7` and `rc.8`. The `ClientContext`, `ChatNode`, `AssistantBlock`, `ToolCallBlock`, header-slot, and locale exports remain available; the host still emits `data-chat-flow`, `data-chat-flow-key`, `data-variant="think"`, `data-tool`, `data-state`, `data-disclosure-row`, `assistant-step`, and `tool-call`. With the `rc.8` dependencies, typecheck, all 18 tests, and the build pass. This does not replace a real DSH Web/Desktop UI regression check.
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 

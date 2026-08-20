@@ -225,8 +225,10 @@ src/
 
 | 运行环境                  | 版本                                 | 结果                                     |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness 官方 Web | `master`，提交 `99f6f02`（发布线 `0.1.0-rc.7`） | 稳定标记和扩展点核对通过                 |
+| DeepSeek Harness 官方 Web | `0.1.0-rc.8` 客户端发布包 | 依赖声明、导出 API 和稳定标记核对通过 |
 | DSH Desktop（Windows）     | `2.0.1`，内置 DSH `0.1.0-rc.7`       | 本地 profile 安装和真实 UI 验证通过       |
+
+`0.1.0-rc.8` 兼容性审计（2026-08-20）：插件依赖的四个客户端包均已对比 `rc.7` 与 `rc.8`。`ClientContext`、`ChatNode`、`AssistantBlock`、`ToolCallBlock`、Header slot 和 locale 类型导出保持可用；`data-chat-flow`、`data-chat-flow-key`、`data-variant="think"`、`data-tool`、`data-state`、`data-disclosure-row`、`assistant-step` 与 `tool-call` 标记仍由宿主输出。使用 `rc.8` 依赖运行 `typecheck`、18 个测试和构建均通过。未替代真实 DSH Web/Desktop UI 回归验证。
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
