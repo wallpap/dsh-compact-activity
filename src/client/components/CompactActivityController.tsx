@@ -33,21 +33,25 @@ function rowsIn(container: HTMLElement): Map<string, HTMLElement> {
     .map(row => [row.dataset['chatFlowKey'] ?? '', row]))
 }
 
-function markerIn(container: HTMLElement, firstKey: string): HTMLDetailsElement | null {
-  return [...container.querySelectorAll<HTMLDetailsElement>(`details[${MARKER_ATTRIBUTE}]`)]
-    .find(marker => marker.dataset['dcaActivityGroup'] === firstKey) ?? null
+function markersIn(container: HTMLElement): Map<string, HTMLDetailsElement> {
+  return new Map([...container.querySelectorAll<HTMLDetailsElement>(`details[${MARKER_ATTRIBUTE}]`)]
+    .map(marker => [marker.dataset['dcaActivityGroup'] ?? '', marker]))
 }
 
 /**
  * 同一 assistant 行可有多个 Think，按 DSH 的 DOM 顺序与分组条目一一对应。
  * 工具行只取根 [data-tool]，因为嵌套调用仍由官方工具组件在该根行内部展示。
  */
-function memberElementsIn(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup): MemberElement[] {
+function memberElementsIn(
+  rows: ReadonlyMap<string, HTMLElement>,
+  group: ActivityGroup,
+  membersByRow: ReadonlyMap<string, readonly ActivityGroup['members'][number][]>,
+): MemberElement[] {
   const result: MemberElement[] = []
   for (const key of group.keys) {
     const row = rows.get(key)
     if (row === undefined) continue
-    const members = group.members.filter(member => member.rowKey === key)
+    const members = membersByRow.get(key) ?? []
     const reasoning = [...row.querySelectorAll<HTMLElement>('[data-variant="think"]')]
     const tool = row.querySelector<HTMLElement>('[data-tool]')
     let reasoningIndex = 0
@@ -71,7 +75,13 @@ function syncGroupMembers(
   group: ActivityGroup,
   liveMembers: Set<HTMLElement>,
 ): void {
-  const members = memberElementsIn(rows, group)
+  const membersByRow = new Map<string, ActivityGroup['members'][number][]>()
+  for (const member of group.members) {
+    const rowMembers = membersByRow.get(member.rowKey)
+    if (rowMembers === undefined) membersByRow.set(member.rowKey, [member])
+    else rowMembers.push(member)
+  }
+  const members = memberElementsIn(rows, group, membersByRow)
   for (const [index, member] of members.entries()) {
     liveMembers.add(member.element)
     member.element.classList.add(MEMBER_CLASS)
@@ -260,27 +270,30 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
   const liveMarkers = new Set(visibleGroups.map(group => group.firstKey))
   const liveMembers = new Set<HTMLElement>()
+  const markers = markersIn(container)
 
   // 宿主可能复用或移除行。先撤销上一轮标记，避免过期分组继续隐藏新内容。
-  for (const row of rows.values()) {
-    row.classList.remove(CHILD_CLASS)
-    for (const reasoning of row.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
-      reasoning.classList.remove(REASONING_CHILD_CLASS)
-    }
+  for (const row of rows.values()) row.classList.remove(CHILD_CLASS)
+  for (const reasoning of container.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
+    reasoning.classList.remove(REASONING_CHILD_CLASS)
   }
-  for (const marker of [...container.querySelectorAll<HTMLDetailsElement>(`details[${MARKER_ATTRIBUTE}]`)]) {
-    if (!liveMarkers.has(marker.dataset['dcaActivityGroup'] ?? '')) marker.remove()
+  for (const [firstKey, marker] of markers) {
+    if (!liveMarkers.has(firstKey)) {
+      marker.remove()
+      markers.delete(firstKey)
+    }
   }
 
   for (const group of visibleGroups) {
     const first = rows.get(group.firstKey)
     if (first === undefined) continue
-    let marker = markerIn(container, group.firstKey)
-    if (marker === null) {
+    let marker = markers.get(group.firstKey)
+    if (marker === undefined) {
       marker = document.createElement('details')
       marker.className = 'dca-activity-group'
       marker.dataset['dcaActivityGroup'] = group.firstKey
       first.before(marker)
+      markers.set(group.firstKey, marker)
     } else if (marker.nextElementSibling !== first) {
       first.before(marker)
     }
@@ -303,6 +316,25 @@ function sync(groups: readonly ActivityGroup[], t: ActivityTranslate): void {
   }
 }
 
+function isElement(node: Node): node is Element {
+  return node.nodeType === 1
+}
+
+function isInChatFlow(node: Node): boolean {
+  const element = isElement(node) ? node : node.parentElement
+  return element !== null && element !== undefined && element.closest('[data-chat-flow]') !== null
+}
+
+function containsChatFlow(node: Node): boolean {
+  return isElement(node) && (node.matches('[data-chat-flow]') || node.querySelector('[data-chat-flow]') !== null)
+}
+
+function affectsChatFlow(records: readonly MutationRecord[]): boolean {
+  return records.some(record => isInChatFlow(record.target)
+    || (record.type === 'childList'
+      && [...record.addedNodes, ...record.removedNodes].some(containsChatFlow)))
+}
+
 function cleanup(): void {
   for (const row of document.querySelectorAll<HTMLElement>(`.${CHILD_CLASS}`)) row.classList.remove(CHILD_CLASS)
   for (const reasoning of document.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
@@ -322,34 +354,52 @@ export function CompactActivityController({ useSession, t }: ControllerProps): n
   const chat = useSession(snapshot => snapshot.chat)
   const groups = activityGroups(chat.order, chat.nodes)
   const groupsRef = useRef<readonly ActivityGroup[]>(groups)
+  const tRef = useRef(t)
   groupsRef.current = groups
-  const syncRef = useRef<() => void>(() => {})
+  tRef.current = t
+  const scheduleRef = useRef<(() => void) | undefined>(undefined)
 
   useEffect(() => {
-    // 观察器在初次挂载后长期存在，通过 ref 始终读取最新的会话快照和翻译函数。
-    syncRef.current = () => { sync(groupsRef.current, t) }
-    syncRef.current()
+    const schedule = scheduleRef.current
+    if (schedule === undefined) sync(groupsRef.current, tRef.current)
+    else schedule()
   }, [groups, t])
 
   useEffect(() => {
     let queued = false
     let active = true
+    let frame: number | undefined
+    const flush = (): void => {
+      queued = false
+      frame = undefined
+      if (active) sync(groupsRef.current, tRef.current)
+    }
     const schedule = (): void => {
       if (queued) return
       queued = true
-      queueMicrotask(() => {
-        queued = false
-        if (active) syncRef.current()
-      })
+      if (typeof globalThis.requestAnimationFrame === 'function') frame = globalThis.requestAnimationFrame(flush)
+      else queueMicrotask(flush)
     }
+    scheduleRef.current = schedule
     // ponytail: DSH 当前只通过稳定 DOM 标记暴露跨行分组能力；若官方增加过程组
     // slot，应删除此观察器并直接接入该 slot。
-    const observer = new MutationObserver(schedule)
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-    schedule()
+    const observer = new MutationObserver(records => {
+      if (affectsChatFlow(records)) schedule()
+    })
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['data-state'],
+    })
     return () => {
       active = false
       observer.disconnect()
+      if (scheduleRef.current === schedule) scheduleRef.current = undefined
+      if (frame !== undefined && typeof globalThis.cancelAnimationFrame === 'function') {
+        globalThis.cancelAnimationFrame(frame)
+      }
     }
   }, [])
 
