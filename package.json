@@ -1,6 +1,6 @@
 {
   "name": "dsh-compact-activity",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Codex-style one-line disclosures for DeepSeek Harness reasoning and tool activity",
   "author": "wallpap",
   "repository": {
