@@ -15,16 +15,31 @@ The plugin groups consecutive thinking and tool calls into a single-line collaps
 - **Soft panel appearance**: a subtle surface, fine border, and state rail add hierarchy; violet marks running, Miku green marks completion, and red marks execution errors.
 - **Clear expanded ownership**: a neutral process spine connects the summary's flat lower edge to official child rows; consistently rounded child surfaces use pale violet, green, or red for running, completed, or failed states.
 - **Official content unchanged**: expanding still uses DSH's official Think, Code, and tool components.
-- **Message boundaries preserved**: the next model message is never folded into the process list.
+- **Model output preserved**: the next model message is never folded into the process list.
 - **Live status**: while running, it shows `In progress...`, counts, and the latest activity summary.
-- **Failure history retained**: failed process steps have a separate count; a later successful recovery still ends as `Done`.
-- **Accurate terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; later model output does not clear that state.
-- **Counts terminal failures**: non-zero exit codes and terminating signals from PWSH, Bash, and similar terminal tools count as failed steps even when DSH keeps `isError` set to `false`.
-- **Single activities collapse too**: one thinking item or tool call is also placed in a collapsed top-level item.
+- **Failure count**: failed process steps have a separate count.
+- **Counts terminal failures**: in addition to regular tool failures, non-zero exit codes and terminating signals from PWSH, Bash, and similar terminal tools count as failed steps.
+- **Terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; when it ends normally, it shows `Done` and later model output does not clear that state.
 
 The plugin only adjusts the Web UI presentation. It does not modify model context, session logs, or tool execution.
 
 The top-level disclosure's status and counts follow DSH's language setting, with `中文` and `English` dictionaries. When no explicit preference is stored, DSH derives the initial language from the browser; switching the DSH language updates existing disclosure rows. Official tool titles and summaries remain unchanged.
+
+## Screenshots
+
+<img width="1124" height="201" alt="image" src="https://github.com/user-attachments/assets/ee50fdb0-82d1-4493-9342-788a4b985ab4" />
+
+----------
+
+<img width="1124" height="201" alt="image" src="https://github.com/user-attachments/assets/df69b7d5-a87b-4ff6-9bab-b6067bc1583e" />
+
+----------
+
+<img width="1176" height="604" alt="image" src="https://github.com/user-attachments/assets/8ecbd9f3-696b-40db-8532-e255dc0ae4e4" />
+
+-----------
+
+<img width="1149" height="603" alt="image" src="https://github.com/user-attachments/assets/a9fcdba8-c72c-4b79-9171-225b9a2f1e3a" />
 
 ## Installation
 
@@ -93,35 +108,19 @@ The plugin has no separate settings page. After installation, restart DSH Web or
 | Scenario | Display behavior |
 | ------------------ | --------------------------------------- |
 | Multiple consecutive process messages | Grouped into one collapsed top-level item |
-| Thinking in progress | Shows `In progress...`, counts, and `Thinking` |
-| Calling a tool | Shows the last official tool's type and summary |
-| Work finished | Shows `Done` and counts, with no summary |
-| An earlier step fails and later recovers | Shows `Done` and retains the failed-step count |
-| The final process item ends abnormally | Shows `Execution error` with the same icon-count layout |
+| Single process message | Placed in one collapsed top-level process item |
+| Thinking in progress | Shows `In progress...`, counts, and `Thinking` (pale violet) |
+| Calling a tool | Shows the last official tool's type and summary (pale violet) |
+| Work finished | Shows `Done` and counts, with no summary (pale green) |
+| Some tool calls fail but the final tool call succeeds | Shows `Done` and retains the failed-step count |
+| The final process item ends abnormally | Shows `Execution error` with the same icon-count layout (pale red) |
 | Model output follows an execution error | The process group remains `Execution error`; model output stays visible |
-| A tool call in the next turn fails independently | Keeps DSH's official standalone error row and does not attach it to the previous process group |
+| A tool call in the next turn fails independently | Standalone error row; not attached to the previous process group |
 | Switching the DSH language | Status and counts switch between Chinese and English |
 | Top-level item expanded | Connects the original Think and tool components with a process spine and pale per-item state surfaces |
-| Single process message | Placed in one collapsed top-level process item |
-| Thinking followed by a model message | Only the Think is collapsed; the message still displays |
+| Thinking and a model message in one step | Only the Think is collapsed; the message still displays |
 
 Overly long live summaries are truncated automatically and never squeeze the layout.
-
-## Screenshots
-
-<img width="1124" height="201" alt="image" src="https://github.com/user-attachments/assets/ee50fdb0-82d1-4493-9342-788a4b985ab4" />
-
-----------
-
-<img width="1124" height="201" alt="image" src="https://github.com/user-attachments/assets/df69b7d5-a87b-4ff6-9bab-b6067bc1583e" />
-
-----------
-
-<img width="1176" height="604" alt="image" src="https://github.com/user-attachments/assets/8ecbd9f3-696b-40db-8532-e255dc0ae4e4" />
-
------------
-
-<img width="1149" height="603" alt="image" src="https://github.com/user-attachments/assets/a9fcdba8-c72c-4b79-9171-225b9a2f1e3a" />
 
 ## Updating and uninstalling
 
@@ -223,8 +222,6 @@ Compatibility status:
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
 | DeepSeek Harness official Web | `0.1.0-rc.8` client packages | Dependency declarations, exports, and stable markers reviewed |
 | DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.7` | Local profile install and real-UI verification passed |
-
-`0.1.0-rc.8` compatibility audit (2026-08-20): all four client packages used by the plugin were compared between `rc.7` and `rc.8`. The `ClientContext`, `ChatNode`, `AssistantBlock`, `ToolCallBlock`, header-slot, and locale exports remain available; the host still emits `data-chat-flow`, `data-chat-flow-key`, `data-variant="think"`, `data-tool`, `data-state`, `data-disclosure-row`, `assistant-step`, and `tool-call`. With the `rc.8` dependencies, typecheck, all 18 tests, and the build pass. This does not replace a real DSH Web/Desktop UI regression check.
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 
