@@ -70,6 +70,10 @@ function clearMemberPresentation(element: HTMLElement): void {
   delete element.dataset['dcaMemberState']
 }
 
+/**
+ * 为本组的官方过程项附加展示标记。嵌套工具调用只参与计数，仍由根工具组件
+ * 保持自己的官方层级，因此不会在这里生成第二个顶层子项。
+ */
 function syncGroupMembers(
   rows: ReadonlyMap<string, HTMLElement>,
   group: ActivityGroup,
@@ -265,6 +269,10 @@ function setMarkerText(
   marker.append(summary)
 }
 
+/**
+ * 只同步一个可见 Chat Flow。完整组必须都位于该流中，避免在保留的其他会话流
+ * 插入跨会话的总折叠。
+ */
 function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[], t: ActivityTranslate): void {
   const rows = rowsIn(container)
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
@@ -329,6 +337,10 @@ function containsChatFlow(node: Node): boolean {
   return isElement(node) && (node.matches('[data-chat-flow]') || node.querySelector('[data-chat-flow]') !== null)
 }
 
+/**
+ * React 快照决定分组；观察器仅补获流式内容、官方状态和新挂载流程的 DOM 更新，
+ * 避免页面其他区域变动触发整轮同步。
+ */
 function affectsChatFlow(records: readonly MutationRecord[]): boolean {
   return records.some(record => isInChatFlow(record.target)
     || (record.type === 'childList'
@@ -377,6 +389,7 @@ export function CompactActivityController({ useSession, t }: ControllerProps): n
     const schedule = (): void => {
       if (queued) return
       queued = true
+      // 同一帧的流式 DOM 变更合并处理，并经由 ref 读取最新 React 快照和本地化函数。
       if (typeof globalThis.requestAnimationFrame === 'function') frame = globalThis.requestAnimationFrame(flush)
       else queueMicrotask(flush)
     }

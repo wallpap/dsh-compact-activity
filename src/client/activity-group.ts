@@ -11,8 +11,9 @@ export interface ActivityMember {
 
 /** 一组连续的 DSH 官方过程行。 */
 export interface ActivityGroup {
+  /** 组的稳定标识；控制器将总折叠插在对应官方行之前。 */
   readonly firstKey: string
-  /** 所有包含过程项的行；可能包含同时承载正文的边界行。 */
+  /** 按会话顺序排列的过程行；可能包含同时承载正文的边界行。 */
   readonly keys: readonly string[]
   /** 此行的模型正文保持可见，只折叠其中的官方 Think 子项。 */
   readonly partialKey?: string
