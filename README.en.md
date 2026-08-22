@@ -220,8 +220,10 @@ Compatibility status:
 
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
+| DeepSeek Harness official Web | `0.1.1-rc.2` client packages | Typecheck, all 23 jsdom tests, and production build passed |
 | DeepSeek Harness official Web | `0.1.1-rc.1` client packages | Typecheck, all 23 jsdom tests, and production build passed |
 | DeepSeek Harness official Web | `0.1.0-rc.8` client packages | Dependency declarations, exports, and stable markers reviewed |
+| DSH Desktop (Windows) | `2.0.2`, bundled DSH `0.1.1-rc.2` | Upstream dependencies and extension points reviewed; typecheck, all 23 jsdom tests, and production build passed; real Desktop UI not verified |
 | DSH Desktop (Windows) | `2.0.1`, bundled DSH `0.1.0-rc.7` | Local profile install and real-UI verification passed |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.

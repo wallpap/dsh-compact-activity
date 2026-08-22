@@ -221,8 +221,10 @@ src/
 
 | 运行环境                  | 版本                                 | 结果                                     |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
+| DeepSeek Harness 官方 Web | `0.1.1-rc.2` 客户端发布包 | 类型检查、23 个 jsdom 测试和生产构建通过 |
 | DeepSeek Harness 官方 Web | `0.1.1-rc.1` 客户端发布包 | 类型检查、23 个 jsdom 测试和生产构建通过 |
 | DeepSeek Harness 官方 Web | `0.1.0-rc.8` 客户端发布包 | 依赖声明、导出 API 和稳定标记核对通过 |
+| DSH Desktop（Windows）     | `2.0.2`，内置 DSH `0.1.1-rc.2`       | 上游依赖与扩展点核对、类型检查、23 个 jsdom 测试和生产构建通过；真实 Desktop UI 未验证 |
 | DSH Desktop（Windows）     | `2.0.1`，内置 DSH `0.1.0-rc.7`       | 本地 profile 安装和真实 UI 验证通过       |
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
