@@ -44,7 +44,7 @@
 
 ## 安装
 
-### DSH Desktop 2.0.x
+### DSH Desktop 2.0.3
 
 从系统托盘打开 DSH Terminal，针对当前 profile 运行：
 
@@ -93,7 +93,7 @@ dsh --profile web --dump-config
 ```text
 请安装并验证最新版 dsh-compact-activity。
 
-1. 如果目标是 DSH Desktop 2.0.x，直接定位并使用 Desktop 提供的 DSH Terminal 程序或启动入口。不要用普通 PowerShell、CMD 或其他终端代替。找不到 DSH Terminal 时停止并报告，不要猜测路径。
+1. 如果目标是 DSH Desktop 2.0.3，直接定位并使用 Desktop 提供的 DSH Terminal 程序或启动入口。不要用普通 PowerShell、CMD 或其他终端代替。找不到 DSH Terminal 时停止并报告，不要猜测路径。
 2. 在 DSH Terminal 中优先运行 `dsh plugin add dsh-compact-activity@latest`、`dsh --dump-config` 和 `pnpm list dsh-compact-activity --depth 0`。这些命令操作 Desktop 当前 profile，不要添加 `--profile web`。
 3. 用 `pnpm view dsh-compact-activity dist-tags.latest` 查询 npm 最新版本。如果实际安装版本不一致，再运行 `dsh plugin add "dsh-compact-activity@<查询到的版本>"`，不要预先写死版本号。
 4. 只有目标明确是普通 DSH CLI/Web 时，才使用带 `--profile web` 的插件命令。此路径需要 `dsh` 和 `pnpm`；npm 不能代替 pnpm。
@@ -125,7 +125,7 @@ dsh --profile web --dump-config
 
 ## 更新与卸载
 
-Desktop 2.0.x 在 DSH Terminal 中更新或卸载：
+Desktop 2.0.3 在 DSH Terminal 中更新或卸载：
 
 ```powershell
 dsh plugin update dsh-compact-activity --latest
@@ -221,11 +221,8 @@ src/
 
 | 运行环境                  | 版本                                 | 结果                                     |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness 官方 Web | `0.1.1-rc.2` 客户端发布包 | 类型检查、23 个 jsdom 测试和生产构建通过 |
-| DeepSeek Harness 官方 Web | `0.1.1-rc.1` 客户端发布包 | 类型检查、23 个 jsdom 测试和生产构建通过 |
-| DeepSeek Harness 官方 Web | `0.1.0-rc.8` 客户端发布包 | 依赖声明、导出 API 和稳定标记核对通过 |
-| DSH Desktop（Windows）     | `2.0.2`，内置 DSH `0.1.1-rc.2`       | 上游依赖与扩展点核对、类型检查、23 个 jsdom 测试和生产构建通过；真实 Desktop UI 未验证 |
-| DSH Desktop（Windows）     | `2.0.1`，内置 DSH `0.1.0-rc.7`       | 本地 profile 安装和真实 UI 验证通过       |
+| DeepSeek Harness 官方 Web | `0.1.1-rc.2` 客户端发布包 | 兼容；类型检查、23 个 jsdom 测试和生产构建通过 |
+| DSH Desktop（Windows）     | `2.0.3`，内置 DSH `0.1.1-rc.2`       | 兼容；profile 组合和 renderer 健康启动通过；类型检查、23 个 jsdom 测试和生产构建通过； |
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
