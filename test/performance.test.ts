@@ -3,8 +3,8 @@ import test, { afterEach } from 'node:test'
 import { JSDOM } from 'jsdom'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { AssistantBlock, ChatNodeStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { AssistantBlock } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { CompactActivityController } from '../src/client/components/CompactActivityController.tsx'
 import { en } from '../src/client/locales.ts'
 
@@ -165,9 +165,9 @@ function renderFixture(historyRows = HISTORY_ROWS, controlFrames = false): Strea
   root = createRoot(container)
   const rerender = (text: string): void => {
     const currentNodes = [...nodes, assistant(running.key, text, 'running')]
-    const snapshot = { chat: { order: currentNodes.map(node => node.key), nodes: nodeStore(currentNodes) } }
+    const snapshot = { order: currentNodes.map(node => node.key), nodes: nodeStore(currentNodes) }
     const props = {
-      useSession: (select: (value: typeof snapshot) => unknown) => select(snapshot),
+      useChat: (select: (value: typeof snapshot) => unknown) => select(snapshot),
       t: (key: string, params?: Record<string, unknown>) => {
         const template = en[key as keyof typeof en] ?? key
         return params === undefined

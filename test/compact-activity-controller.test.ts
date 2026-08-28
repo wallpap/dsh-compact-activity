@@ -3,8 +3,8 @@ import test, { afterEach } from 'node:test'
 import { JSDOM } from 'jsdom'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { AssistantBlock, ChatNodeStore, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { AssistantBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { CompactActivityController } from '../src/client/components/CompactActivityController.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
@@ -59,8 +59,6 @@ function toolResult(callId: string, isError = false): ToolResultNode {
     callTime: 0,
     content: [],
     isError,
-    callView: null,
-    resultView: null,
     subCalls: [],
   }
 }
@@ -83,7 +81,6 @@ function tool(key: string, running = false, isError = false): ChatNode<'tool-cal
             turn: 1,
             step: 1,
             time: 0,
-            callView: null,
             subCalls: [],
           },
         }
@@ -96,7 +93,7 @@ function store(nodes: readonly ChatNode[]): ChatNodeStore {
   return { get: key => byKey.get(key), values: () => [...nodes] }
 }
 
-function render(nodes: readonly ChatNode[], dictionary: typeof en = en): HTMLElement {
+function render(nodes: readonly ChatNode[], dictionary: typeof en = en, legacy = false): HTMLElement {
   const container = installDom()
   const flow = document.createElement('div')
   flow.dataset['chatFlow'] = ''
@@ -131,9 +128,11 @@ function render(nodes: readonly ChatNode[], dictionary: typeof en = en): HTMLEle
   document.body.append(flow)
 
   // 夹具只复现插件依赖的稳定 DSH DOM 标记，不复制官方过程行的渲染实现。
-  const snapshot = { chat: { order: nodes.map(node => node.key), nodes: store(nodes) } }
+  const snapshot = { order: nodes.map(node => node.key), nodes: store(nodes) }
   const props = {
-    useSession: (select: (value: typeof snapshot) => unknown) => select(snapshot),
+    ...(legacy
+      ? { useSession: (select: (value: { chat: typeof snapshot }) => unknown) => select({ chat: snapshot }) }
+      : { useChat: (select: (value: typeof snapshot) => unknown) => select(snapshot) }),
     t: (key: string, params?: Record<string, unknown>) => {
       const template = dictionary[key as keyof typeof dictionary] ?? key
       return params === undefined
@@ -176,6 +175,13 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(flow.querySelector('[data-chat-flow-key="answer"] [data-variant="think"]')?.classList.contains('dca-activity-reasoning-child'), false)
   assert.equal(firstMember?.classList.contains('dca-activity-member'), true)
   assert.equal(lastMember?.classList.contains('dca-activity-member'), true)
+})
+
+test('falls back to the rc2 session snapshot hook', () => {
+  const flow = render([
+    assistant('reason', [{ kind: 'reasoning', text: '检查' }]),
+  ], en, true)
+  assert.ok(flow.querySelector<HTMLDetailsElement>('details[data-dca-activity-group]'))
 })
 
 test('collapses a single thought and a single tool call', () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import {
   activityGroups, type ActivityGroup, type ActivityMemberState,
 } from '../activity-group.ts'
@@ -7,6 +8,10 @@ import { ACTIVITY_NS } from '../locales.ts'
 
 type ActivityTranslate = TranslateNS<typeof ACTIVITY_NS>
 type ControllerProps = PropsRuntime<'conversation.session.header.actions'> & { t: ActivityTranslate }
+type ChatState = Pick<ChatSnapshot, 'order' | 'nodes'>
+type LegacyControllerProps = {
+  useSession?: <Selected>(selector: (snapshot: { readonly chat: ChatState }) => Selected) => Selected
+}
 
 const MARKER_ATTRIBUTE = 'data-dca-activity-group'
 const CHILD_CLASS = 'dca-activity-child'
@@ -362,8 +367,13 @@ function cleanup(): void {
  * 只向 DOM 添加总折叠。官方 DSH 过程行仍是实际内容，展开后的子项继续使用
  * 官方渲染器、样式及交互。
  */
-export function CompactActivityController({ useSession, t }: ControllerProps): null {
-  const chat = useSession(snapshot => snapshot.chat)
+export function CompactActivityController(props: ControllerProps): null {
+  const { useChat, t } = props
+  const legacyUseSession = (props as unknown as LegacyControllerProps).useSession
+  const chat = typeof useChat === 'function'
+    ? useChat(snapshot => snapshot)
+    : legacyUseSession?.(snapshot => snapshot.chat)
+  if (chat === undefined) return null
   const groups = activityGroups(chat.order, chat.nodes)
   const groupsRef = useRef<readonly ActivityGroup[]>(groups)
   const tRef = useRef(t)

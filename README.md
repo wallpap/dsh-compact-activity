@@ -168,12 +168,16 @@ dsh plugin --profile web remove dsh-compact-activity
 项目使用严格模式 TypeScript。需要 Node.js `22.19+` 或 `24+`：
 
 ```sh
-npm install
+pnpm install
 npm run check
 dsh plugin --profile web add .
 dsh --profile web --dump-config
 dsh --profile web
 ```
+
+当前 DSH alpha 的 client 包尚未发布到 npm；本分支的开发依赖通过
+`../clone/deepseek-harness` 链接到本地 alpha checkout。若两个仓库目录不同，
+请相应调整 `package.json` 中的 `link:` 开发依赖。
 
 如果使用 Harness 源码版，请在 Harness 源码根目录执行 `pnpm dsh ...`，并把 `.` 换成本插件目录的绝对路径。
 
@@ -221,8 +225,9 @@ src/
 
 | 运行环境                  | 版本                                 | 结果                                     |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness 官方 Web | `0.1.1-rc.2` 客户端发布包 | 兼容；类型检查、23 个 jsdom 测试和生产构建通过 |
-| DSH Desktop（Windows）     | `2.0.3`，内置 DSH `0.1.1-rc.2`       | 兼容；profile 组合和 renderer 健康启动通过；类型检查、23 个 jsdom 测试和生产构建通过； |
+| DeepSeek Harness 官方 Web | `0.1.1-rc.2` 客户端发布包             | 兼容；类型检查、25 个 jsdom 测试和生产构建通过 |
+| DeepSeek Harness 源码版   | `dsh-v0.1.2-alpha.1`                  | 插件契约兼容；本地 alpha 类型检查、25 个 jsdom 测试和生产构建通过 |
+| DSH Desktop（Windows）    | `2.0.3`，内置 DSH `0.1.1-rc.2`       | 兼容；profile 组合和 renderer 健康启动通过；类型检查、25 个 jsdom 测试和生产构建通过 |
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 

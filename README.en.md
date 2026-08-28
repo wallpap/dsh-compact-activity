@@ -167,12 +167,17 @@ Troubleshoot in this order:
 The project uses strict-mode TypeScript and requires Node.js `22.19+` or `24+`:
 
 ```sh
-npm install
+pnpm install
 npm run check
 dsh plugin --profile web add .
 dsh --profile web --dump-config
 dsh --profile web
 ```
+
+The current DSH alpha client packages are not published to npm yet; this branch
+uses `link:` development dependencies to the local alpha checkout at
+`../clone/deepseek-harness`. Adjust those paths in `package.json` if the two
+repositories are located elsewhere.
 
 If you use the Harness source build, run `pnpm dsh ...` from the Harness source root and replace `.` with this plugin directory's absolute path.
 
@@ -220,8 +225,9 @@ Compatibility status:
 
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness official Web | `0.1.1-rc.2` client packages | Compatible; typecheck, all 23 jsdom tests, and production build passed |
-| DSH Desktop (Windows) | `2.0.3`, bundled DSH `0.1.1-rc.2` | Compatible; profile composition and healthy renderer startup passed; typecheck, all 23 jsdom tests, and production build passed;  |
+| DeepSeek Harness official Web | `0.1.1-rc.2` client packages | Compatible; typecheck, all 25 jsdom tests, and production build passed |
+| DeepSeek Harness source build | `dsh-v0.1.2-alpha.1` | Plugin contract compatible; local alpha typecheck, all 25 jsdom tests, and production build passed |
+| DSH Desktop (Windows) | `2.0.3`, bundled DSH `0.1.1-rc.2` | Compatible; profile composition and healthy renderer startup passed; typecheck, all 25 jsdom tests, and production build passed |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 

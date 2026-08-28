@@ -1,5 +1,5 @@
-import type { AssistantBlock, ChatNodeStore, ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { AssistantBlock, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 
 export type ActivityMemberState = 'running' | 'done' | 'error'
 
@@ -98,15 +98,38 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   })
 }
 
-/**
- * 已完成的工具结果才带 kind。终端工具即使没有设置 isError，也可能以非零
- * exitCode 或 signal 失败。子调用参与计数，但只有根调用对应一条顶层官方过程行。
- */
+/** Alpha 使用结果文本尾标记；rc2 的 resultView 回退保留 Desktop 兼容性。 */
+function terminalFailed(block: ToolResultNode): boolean {
+  const legacyResult = (block as ToolResultNode & {
+    resultView?: { card?: string; exitCode?: number; signal?: string } | null
+  }).resultView
+  if (legacyResult?.card === 'terminal') {
+    return (legacyResult.exitCode !== undefined && legacyResult.exitCode !== 0)
+      || legacyResult.signal !== undefined
+  }
+
+  const call = block.call
+  if (call === null || (call.name !== 'bash' && call.name !== 'pwsh')) return false
+  let args: unknown
+  try {
+    args = JSON.parse(call.argsRaw)
+  } catch {
+    return false
+  }
+  if (typeof args !== 'object' || args === null || Array.isArray(args)) return false
+  const record = args as Record<string, unknown>
+  if (typeof record['description'] !== 'string' || record['description'].trim() === '') return false
+  if (record['run_in_background'] === true || block.content.length !== 1) return false
+  const result = block.content[0]
+  if (result?.type !== 'text') return false
+  if (/\n\[killed by signal: ([^\]\n]+)\]$/.test(result.text)) return true
+  const exit = /\n\[exit code: (\d+)\]$/.exec(result.text)
+  return exit?.[1] !== undefined && Number(exit[1]) !== 0
+}
+
+/** 已完成的工具结果才带 kind；子调用参与计数，但只有根调用对应一条顶层官方过程行。 */
 function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): ActivityEntry[] {
-  const failed = 'kind' in block && (block.isError
-    || (block.resultView?.card === 'terminal'
-      && ((block.resultView.exitCode !== undefined && block.resultView.exitCode !== 0)
-        || block.resultView.signal !== undefined)))
+  const failed = 'kind' in block && (block.isError || terminalFailed(block))
   return [
     {
       rowKey,

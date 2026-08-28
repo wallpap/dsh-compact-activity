@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type {
-  AssistantBlock, ChatNodeStore, RunningToolCall, ToolCallBlock, ToolResultNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+  AssistantBlock, RunningToolCall, ToolCallBlock, ToolResultNode,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { activityGroups } from '../src/client/activity-group.ts'
 
 function assistant(
@@ -34,8 +34,6 @@ function settledTool(callId: string, name: string, subCalls: readonly ToolCallBl
     callTime: 0,
     content: [],
     isError: false,
-    callView: null,
-    resultView: null,
     subCalls,
   }
 }
@@ -68,8 +66,23 @@ function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'
   // 模拟 DSH 未设置 isError、但终端进程已非零退出的情况。
   return {
     ...tool(key, name),
-    data: { root: { ...settledTool(key, name), resultView: { card: 'terminal', exitCode } } },
+    data: {
+      root: {
+        ...settledTool(key, name),
+        call: { name, argsRaw: JSON.stringify({ command: 'exit', description: '运行命令' }) },
+        content: [{ type: 'text', text: `命令失败\n[exit code: ${exitCode}]` }],
+      },
+    },
   }
+}
+
+function failedLegacyTerminalTool(
+  key: string,
+  name: string,
+  resultView: { card: 'terminal'; exitCode?: number; signal?: string },
+): ChatNode<'tool-call'> {
+  const root = { ...settledTool(key, name), resultView } as ToolResultNode
+  return { ...tool(key, name), data: { root } }
 }
 
 function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
@@ -81,7 +94,6 @@ function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock
     turn: 1,
     step: 1,
     time: 0,
-    callView: null,
     subCalls,
   }
   return {
@@ -296,6 +308,19 @@ test('counts nonzero terminal exits as tool failures', () => {
   assert.equal(group?.failureCount, 1)
   assert.equal(group?.error, true)
   assert.deepEqual(group?.members.map(member => member.state), ['done', 'error'])
+})
+
+test('keeps rc2 terminal result views as tool failures', () => {
+  const nodes = [
+    assistant('reason', [{ kind: 'reasoning', text: '执行命令' }]),
+    failedLegacyTerminalTool('exit', 'pwsh', { card: 'terminal', exitCode: 1 }),
+    failedLegacyTerminalTool('signal', 'bash', { card: 'terminal', signal: 'TERM' }),
+  ] satisfies readonly ChatNode[]
+
+  const group = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
+  assert.equal(group?.failureCount, 2)
+  assert.equal(group?.error, true)
+  assert.deepEqual(group?.members.map(member => member.state), ['done', 'error', 'error'])
 })
 
 test('counts deeply nested and sibling tool calls', () => {
