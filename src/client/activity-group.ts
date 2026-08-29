@@ -98,16 +98,8 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   })
 }
 
-/** Alpha 使用结果文本尾标记；rc2 的 resultView 回退保留 Desktop 兼容性。 */
+/** Parse the terminal result markers used by DSH 0.1.2-alpha.1. */
 function terminalFailed(block: ToolResultNode): boolean {
-  const legacyResult = (block as ToolResultNode & {
-    resultView?: { card?: string; exitCode?: number; signal?: string } | null
-  }).resultView
-  if (legacyResult?.card === 'terminal') {
-    return (legacyResult.exitCode !== undefined && legacyResult.exitCode !== 0)
-      || legacyResult.signal !== undefined
-  }
-
   const call = block.call
   if (call === null || (call.name !== 'bash' && call.name !== 'pwsh')) return false
   let args: unknown

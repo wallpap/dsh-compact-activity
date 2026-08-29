@@ -2,11 +2,18 @@ export const STYLE_ID = 'dsh-compact-activity'
 
 /**
  * 仅定义插件添加的总折叠和成员标记；展开后的 DSH 官方过程行沿用原样式。
- * 前两条规则只负责隐藏，实际展开状态仍由原生 <details> 与控制器同步。
+ * hidden 属性负责布局可见性；class 仅保留为插件成员的展示标记。
  */
 export const STYLE_TEXT = String.raw`
 .dca-activity-child,
 .dca-activity-reasoning-child {
+  display: none !important;
+}
+
+/* hidden=until-found intentionally retains a layout box. This marker is
+   plugin-owned, so it can remove that box without taking ownership of the
+   host's hidden attribute. */
+[data-dca-hidden] {
   display: none !important;
 }
 
@@ -25,6 +32,28 @@ export const STYLE_TEXT = String.raw`
   position: relative;
   min-width: 0;
   color: var(--dsw-alias-label-secondary);
+}
+
+/* Keep the plugin flow denser than the host's 16px transcript rhythm. The
+   marker, its first row, consecutive process rows, and the first external row
+   after a hidden group all use one 8px rhythm. */
+.dca-activity-group[data-dca-spaced],
+.dca-activity-group + .dca-activity-row,
+.dca-activity-row + .dca-activity-row,
+.dca-activity-after {
+  margin-top: 8px !important;
+}
+
+/* DSH uses hidden=until-found for inline Think blocks. That state keeps the
+   block's layout box; while our group is closed it must not reserve that box. */
+.dca-activity-group:not([open]) ~ .dca-activity-row [data-turn-process-inline][hidden] {
+  display: none !important;
+}
+
+/* A mixed official assistant row has Think and正文 as siblings in this body.
+   Keep that boundary on the same 8px rhythm as the collapsed flow rows. */
+.dca-activity-inline-body {
+  row-gap: 8px !important;
 }
 
 .dca-activity-group[data-running='true'] {

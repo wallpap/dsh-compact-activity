@@ -76,15 +76,6 @@ function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'
   }
 }
 
-function failedLegacyTerminalTool(
-  key: string,
-  name: string,
-  resultView: { card: 'terminal'; exitCode?: number; signal?: string },
-): ChatNode<'tool-call'> {
-  const root = { ...settledTool(key, name), resultView } as ToolResultNode
-  return { ...tool(key, name), data: { root } }
-}
-
 function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
   // RunningToolCall 没有 kind，这是 activity-group 区分运行中与已完成调用的依据。
   const root: RunningToolCall = {
@@ -308,19 +299,6 @@ test('counts nonzero terminal exits as tool failures', () => {
   assert.equal(group?.failureCount, 1)
   assert.equal(group?.error, true)
   assert.deepEqual(group?.members.map(member => member.state), ['done', 'error'])
-})
-
-test('keeps rc2 terminal result views as tool failures', () => {
-  const nodes = [
-    assistant('reason', [{ kind: 'reasoning', text: '执行命令' }]),
-    failedLegacyTerminalTool('exit', 'pwsh', { card: 'terminal', exitCode: 1 }),
-    failedLegacyTerminalTool('signal', 'bash', { card: 'terminal', signal: 'TERM' }),
-  ] satisfies readonly ChatNode[]
-
-  const group = activityGroups(nodes.map(node => node.key), nodeStore(nodes))[0]
-  assert.equal(group?.failureCount, 2)
-  assert.equal(group?.error, true)
-  assert.deepEqual(group?.members.map(member => member.state), ['done', 'error', 'error'])
 })
 
 test('counts deeply nested and sibling tool calls', () => {

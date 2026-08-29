@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import {
   activityGroups, type ActivityGroup, type ActivityMemberState,
 } from '../activity-group.ts'
@@ -8,17 +7,20 @@ import { ACTIVITY_NS } from '../locales.ts'
 
 type ActivityTranslate = TranslateNS<typeof ACTIVITY_NS>
 type ControllerProps = PropsRuntime<'conversation.session.header.actions'> & { t: ActivityTranslate }
-type ChatState = Pick<ChatSnapshot, 'order' | 'nodes'>
-type LegacyControllerProps = {
-  useSession?: <Selected>(selector: (snapshot: { readonly chat: ChatState }) => Selected) => Selected
-}
 
 const MARKER_ATTRIBUTE = 'data-dca-activity-group'
 const CHILD_CLASS = 'dca-activity-child'
 const REASONING_CHILD_CLASS = 'dca-activity-reasoning-child'
+const ROW_CLASS = 'dca-activity-row'
+const AFTER_CLASS = 'dca-activity-after'
+const INLINE_BODY_CLASS = 'dca-activity-inline-body'
 const MEMBER_CLASS = 'dca-activity-member'
 const MEMBER_FIRST_CLASS = 'dca-activity-member-first'
 const MEMBER_LAST_CLASS = 'dca-activity-member-last'
+const PLUGIN_HIDDEN_ATTRIBUTE = 'data-dca-hidden'
+const PLUGIN_HIDDEN_DATASET = 'dcaHidden'
+const OFFICIAL_HIDDEN_DATASET = 'dcaOfficialHidden'
+const PLUGIN_MARKER_HIDDEN_DATASET = 'dcaMarkerHidden'
 
 interface MemberElement {
   readonly element: HTMLElement
@@ -75,6 +77,17 @@ function clearMemberPresentation(element: HTMLElement): void {
   delete element.dataset['dcaMemberState']
 }
 
+function setPluginHidden(element: HTMLElement, hidden: boolean): void {
+  if (hidden) {
+    element.dataset[PLUGIN_HIDDEN_DATASET] = ''
+    if (!element.hasAttribute('hidden')) element.setAttribute('hidden', '')
+    return
+  }
+  if (element.dataset[PLUGIN_HIDDEN_DATASET] === undefined) return
+  delete element.dataset[PLUGIN_HIDDEN_DATASET]
+  if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
+}
+
 /**
  * 为本组的官方过程项附加展示标记。嵌套工具调用只参与计数，仍由根工具组件
  * 保持自己的官方层级，因此不会在这里生成第二个顶层子项。
@@ -107,13 +120,98 @@ function setGroupOpen(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGro
   for (const key of group.keys) {
     const row = rows.get(key)
     if (row === undefined) continue
+    row.classList.add(ROW_CLASS)
     if (key === group.partialKey) {
       for (const reasoning of row.querySelectorAll<HTMLElement>('[data-variant="think"]')) {
         reasoning.classList.toggle(REASONING_CHILD_CLASS, !open)
+        // DSH only adds data-turn-process-inline while its own total process
+        // disclosure is closed. When that disclosure is open, the same
+        // wrapper remains attribute-less; hide it too or the empty flex item
+        // still contributes both sides of the official 16px body gap.
+        const parent = reasoning.parentElement
+        const inlineProcess = reasoning.closest<HTMLElement>('[data-turn-process-inline]')
+          ?? (parent?.childElementCount === 1 && parent.firstElementChild === reasoning ? parent : undefined)
+        inlineProcess?.parentElement?.classList.add(INLINE_BODY_CLASS)
+        setPluginHidden(inlineProcess ?? reasoning, !open)
       }
     } else {
       row.classList.toggle(CHILD_CLASS, !open)
+      setPluginHidden(row, !open)
     }
+  }
+}
+
+function syncGroupSpacing(
+  marker: HTMLDetailsElement,
+  group: ActivityGroup,
+  orderedRows: readonly HTMLElement[],
+): void {
+  if (marker.previousElementSibling !== null) marker.dataset['dcaSpaced'] = ''
+  else delete marker.dataset['dcaSpaced']
+
+  // The marker is followed by hidden process rows in the DOM. Space the first
+  // visible row as well, including a partial assistant row that keeps正文.
+  let sibling = marker.nextElementSibling
+  while (sibling !== null) {
+    if (sibling instanceof HTMLElement && sibling.matches('[data-chat-flow-key]') && !sibling.hidden) {
+      sibling.classList.add(AFTER_CLASS)
+      break
+    }
+    sibling = sibling.nextElementSibling
+  }
+
+  const lastKey = group.keys.at(-1)
+  const lastIndex = lastKey === undefined
+    ? -1
+    : orderedRows.findIndex(row => row.dataset['chatFlowKey'] === lastKey)
+  for (let index = lastIndex + 1; index < orderedRows.length; index++) {
+    const next = orderedRows[index]
+    if (next === undefined || next.hidden) continue
+    next.classList.add(AFTER_CLASS)
+    break
+  }
+}
+
+/** Remove the layout box retained by DSH's searchable hidden process rows. */
+function syncOfficialHiddenRows(rows: ReadonlyMap<string, HTMLElement>): void {
+  for (const row of rows.values()) {
+    if (row.hasAttribute('data-turn-process-hidden')) {
+      row.dataset[OFFICIAL_HIDDEN_DATASET] = ''
+      setPluginHidden(row, true)
+      continue
+    }
+    if (row.dataset[OFFICIAL_HIDDEN_DATASET] === undefined) continue
+    delete row.dataset[OFFICIAL_HIDDEN_DATASET]
+    // A closed plugin group still owns this row's hidden state.
+    if (!row.classList.contains(CHILD_CLASS)) setPluginHidden(row, false)
+  }
+}
+
+function officialTurnControl(
+  container: HTMLElement,
+  group: ActivityGroup,
+  rows: ReadonlyMap<string, HTMLElement>,
+): HTMLElement | undefined {
+  const turn = rows.get(group.firstKey)?.dataset['chatTurn']
+  if (turn === undefined) return undefined
+  return [...container.querySelectorAll<HTMLElement>('[data-turn-process]')]
+    .find(control => control.dataset['turnProcess'] === turn)
+}
+
+function syncOfficialTurnVisibility(
+  container: HTMLElement,
+  marker: HTMLDetailsElement,
+  group: ActivityGroup,
+  rows: ReadonlyMap<string, HTMLElement>,
+): void {
+  const control = officialTurnControl(container, group, rows)
+  const hidden = control?.getAttribute('aria-expanded') === 'false'
+  if (hidden) {
+    marker.dataset[PLUGIN_MARKER_HIDDEN_DATASET] = ''
+    marker.hidden = true
+  } else if (marker.dataset[PLUGIN_MARKER_HIDDEN_DATASET] !== undefined) {
+    delete marker.dataset[PLUGIN_MARKER_HIDDEN_DATASET]
+    marker.hidden = false
   }
 }
 
@@ -280,15 +378,27 @@ function setMarkerText(
  */
 function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[], t: ActivityTranslate): void {
   const rows = rowsIn(container)
+  const orderedRows = [...rows.values()]
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
+  const activeKeys = new Set(visibleGroups.flatMap(group => group.keys))
   const liveMarkers = new Set(visibleGroups.map(group => group.firstKey))
   const liveMembers = new Set<HTMLElement>()
   const markers = markersIn(container)
 
   // 宿主可能复用或移除行。先撤销上一轮标记，避免过期分组继续隐藏新内容。
-  for (const row of rows.values()) row.classList.remove(CHILD_CLASS)
+  for (const [key, row] of rows) {
+    row.classList.remove(CHILD_CLASS)
+    row.classList.remove(ROW_CLASS)
+    row.classList.remove(AFTER_CLASS)
+    if (!activeKeys.has(key) && row.dataset[PLUGIN_HIDDEN_DATASET] !== undefined) {
+      setPluginHidden(row, false)
+    }
+  }
   for (const reasoning of container.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
     reasoning.classList.remove(REASONING_CHILD_CLASS)
+  }
+  for (const body of container.querySelectorAll<HTMLElement>(`.${INLINE_BODY_CLASS}`)) {
+    body.classList.remove(INLINE_BODY_CLASS)
   }
   for (const [firstKey, marker] of markers) {
     if (!liveMarkers.has(firstKey)) {
@@ -311,12 +421,15 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
       first.before(marker)
     }
     marker.ontoggle = () => {
-      setGroupOpen(rowsIn(container), group, marker.open)
+      syncContainer(container, groups, t)
     }
     setMarkerText(marker, group, liveSummary(rows, group, t), t)
+    syncOfficialTurnVisibility(container, marker, group, rows)
     syncGroupMembers(rows, group, liveMembers)
     setGroupOpen(rows, group, marker.open)
+    syncGroupSpacing(marker, group, orderedRows)
   }
+  syncOfficialHiddenRows(rows)
   for (const member of container.querySelectorAll<HTMLElement>(`.${MEMBER_CLASS}`)) {
     if (!liveMembers.has(member)) clearMemberPresentation(member)
   }
@@ -354,8 +467,17 @@ function affectsChatFlow(records: readonly MutationRecord[]): boolean {
 
 function cleanup(): void {
   for (const row of document.querySelectorAll<HTMLElement>(`.${CHILD_CLASS}`)) row.classList.remove(CHILD_CLASS)
+  for (const row of document.querySelectorAll<HTMLElement>(`.${ROW_CLASS}`)) row.classList.remove(ROW_CLASS)
   for (const reasoning of document.querySelectorAll<HTMLElement>(`.${REASONING_CHILD_CLASS}`)) {
     reasoning.classList.remove(REASONING_CHILD_CLASS)
+  }
+  for (const body of document.querySelectorAll<HTMLElement>(`.${INLINE_BODY_CLASS}`)) {
+    body.classList.remove(INLINE_BODY_CLASS)
+  }
+  for (const element of document.querySelectorAll<HTMLElement>(`[${PLUGIN_HIDDEN_ATTRIBUTE}]`)) {
+    delete element.dataset[PLUGIN_HIDDEN_DATASET]
+    delete element.dataset[OFFICIAL_HIDDEN_DATASET]
+    if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
   }
   for (const member of document.querySelectorAll<HTMLElement>(`.${MEMBER_CLASS}`)) {
     clearMemberPresentation(member)
@@ -369,11 +491,7 @@ function cleanup(): void {
  */
 export function CompactActivityController(props: ControllerProps): null {
   const { useChat, t } = props
-  const legacyUseSession = (props as unknown as LegacyControllerProps).useSession
-  const chat = typeof useChat === 'function'
-    ? useChat(snapshot => snapshot)
-    : legacyUseSession?.(snapshot => snapshot.chat)
-  if (chat === undefined) return null
+  const chat = useChat(snapshot => snapshot)
   const groups = activityGroups(chat.order, chat.nodes)
   const groupsRef = useRef<readonly ActivityGroup[]>(groups)
   const tRef = useRef(t)
@@ -414,7 +532,7 @@ export function CompactActivityController(props: ControllerProps): null {
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['data-state'],
+      attributeFilter: ['data-state', 'aria-expanded', 'hidden', 'data-turn-process-hidden'],
     })
     return () => {
       active = false
