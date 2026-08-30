@@ -98,7 +98,7 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   })
 }
 
-/** Parse the terminal result markers used by DSH 0.1.2-alpha.1. */
+/** Parse the terminal result markers used by DSH 0.1.2-alpha.2. */
 function terminalFailed(block: ToolResultNode): boolean {
   const call = block.call
   if (call === null || (call.name !== 'bash' && call.name !== 'pwsh')) return false
