@@ -225,8 +225,8 @@ src/
 
 | 运行环境                  | 版本                                 | 结果                                     |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness 官方 Web | `0.1.2-alpha.2` 客户端发布包         | 源码兼容；类型检查、jsdom 测试和生产构建通过；真实宿主未回归 |
-| DSH Desktop（Windows）    | `2.0.4`，内置 DSH `0.1.2-alpha.2`    | 源码兼容；真实 Desktop 启动和 profile 组合未回归 |
+| DeepSeek Harness 官方 Web | `0.1.2-alpha.3` 客户端发布包         | 源码兼容；类型检查、jsdom 测试和生产构建通过；真实宿主未回归 |
+| DSH Desktop（Windows）    | `2.0.4`，内置 DSH `0.1.2-alpha.3`    | 源码兼容；真实 Desktop 启动和 profile 组合未回归 |
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
