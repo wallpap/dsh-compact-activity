@@ -225,8 +225,8 @@ Compatibility status:
 
 | Environment | Version | Result |
 | ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness official Web | `0.1.3-alpha.1` client packages | Source-compatible; typecheck, jsdom tests, and production build passed; host runtime not run |
-| DSH Desktop (Windows) | `2.0.5`, bundled DSH `0.1.2-rc.1` | Reuses the same Web Client contract; Desktop startup and profile composition not run |
+| DeepSeek Harness official Web | `0.1.5-rc.2` (verified against master source) | Source-compatible; typecheck, jsdom tests, and production build passed; host runtime not run |
+| DSH Desktop (Windows) | `2.0.9`, bundled DSH `0.1.5-rc.1` | Reuses the same Web Client contract; bundled version shares the verified contract surface; Desktop startup and profile composition not run |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 
