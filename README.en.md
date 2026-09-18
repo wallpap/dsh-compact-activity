@@ -43,7 +43,7 @@ The top-level disclosure's status and counts follow DSH's language setting, with
 
 ## Installation
 
-### DSH Desktop 2.0.4
+### DSH Desktop 2.0.12 (Beta: 2.0.12-beta.1)
 
 Open the DSH Terminal from the system tray and run, against the current profile:
 
@@ -92,7 +92,7 @@ If your agent can use a terminal, send it the following:
 ```text
 Please install and verify the latest version of dsh-compact-activity.
 
-1. If the target is DSH Desktop 2.0.4, locate and use the DSH Terminal program or launch entry provided by Desktop. Don't use plain PowerShell, CMD, or another terminal instead. If you can't find DSH Terminal, stop and report; don't guess paths.
+1. If the target is DSH Desktop (stable 2.0.12 or Beta 2.0.12-beta.1), locate and use the DSH Terminal program or launch entry provided by Desktop. Don't use plain PowerShell, CMD, or another terminal instead. If you can't find DSH Terminal, stop and report; don't guess paths.
 2. In DSH Terminal, prefer running `dsh plugin add dsh-compact-activity@latest`, `dsh --dump-config`, and `pnpm list dsh-compact-activity --depth 0`. These operate on Desktop's current profile; don't add `--profile web`.
 3. Query the npm latest version with `pnpm view dsh-compact-activity dist-tags.latest`. If the installed version differs, run `dsh plugin add "dsh-compact-activity@<queried version>"`; don't hardcode a version.
 4. Use `--profile web` commands only when the target is clearly a plain DSH CLI/Web setup. That path requires `dsh` and `pnpm`; npm can't replace pnpm.
@@ -124,7 +124,7 @@ Overly long live summaries are truncated automatically and never squeeze the lay
 
 ## Updating and uninstalling
 
-Desktop 2.0.4, in the DSH Terminal:
+In the DSH Desktop DSH Terminal:
 
 ```powershell
 dsh plugin update dsh-compact-activity --latest
@@ -223,10 +223,13 @@ src/
 
 Compatibility status:
 
+As of September 18, 2026, the results below are based on the local source checkouts and Desktop's vendored runtime archives; a real Electron/Desktop window has not yet been launched for manual regression.
+
 | Environment | Version | Result |
-| ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness official Web | `0.1.5-rc.2` (verified against master source) | Source-compatible; typecheck, jsdom tests, and production build passed; host runtime not run |
-| DSH Desktop (Windows) | `2.0.9`, bundled DSH `0.1.5-rc.1` | Reuses the same Web Client contract; bundled version shares the verified contract surface; Desktop startup and profile composition not run |
+| ----------- | ------- | ------ |
+| DeepSeek Harness official Web | `0.1.6-alpha.2` (commit `ddefc45f`) | The plugin dev dependencies link directly to the latest local source; `npm run typecheck` and `npm run build` pass, and the grouping/controller tests pass. In the full `npm test`, the performance benchmark can fall below its 200/300 tops threshold under the current machine load; the performance test passes when run in isolation. |
+| Community DSH Desktop stable | `2.0.12`, bundled DSH `0.1.5-rc.2` | The `vendor/dsh-runtime/0.1.5-rc.2` Client bundle still contains the Chat Flow, Think, Tool, and Turn-process markers; no source-contract conflict was found, but real Desktop startup and profile composition were not run. |
+| Community DSH Desktop Beta | `2.0.12-beta.1`, bundled DSH `0.1.6-alpha.2` | Uses the same Client contract as the current official Web source; the Beta runtime version matches the local source checkout. Real Desktop startup and profile composition were not run. |
 
 Linux and macOS users can also use the plugin through the official CLI/Web.
 
@@ -239,6 +242,12 @@ The plugin relies on the following DSH Web extension points and stable markers:
 - `assistant-step` and `tool-call` Chat Node data
 
 The dictionaries register in the plugin-owned `compact-activity` namespace, and statuses and counts render through DSH's injected `t` translator; the other markers are provided by DSH and are not a public API controlled by this plugin. After upgrading DSH, manually check top-level grouping, official sub-item interactions, language switching, and live tool summaries.
+
+### Image-folding assessment
+
+Current DSH `0.1.6-alpha.2` renders conversation images through the single `conversation.message.images` slot, but it does not expose a composable image-slot chain or a promised stable image-group DOM marker. The plugin currently relies only on the Chat Flow, Think, Tool, and Chat Node contracts; `image` / `other` blocks in an `assistant-step` remain visible-content boundaries and are not hidden by default.
+
+For that reason, this compatibility update does not add a default “fold all images” mode. A temporary DOM wrapper or single-slot replacement could break React reconciliation, the authorized image loader, lightbox interactions, or accidentally fold user attachments and tool-result images. A safe implementation needs an upstream image chain slot or a stable marker such as `data-message-image-group`; then the plugin can add a native `<details>/<summary>` with the official image subtree and lightbox behavior intact. The current single `conversation.message.images` slot does not provide that extension seam.
 
 ### DSH Desktop service boundary
 

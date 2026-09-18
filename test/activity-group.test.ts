@@ -42,6 +42,15 @@ function errorTool(callId: string, name: string, subCalls: readonly ToolCallBloc
   return { ...settledTool(callId, name, subCalls), isError: true }
 }
 
+function structuredErrorTool(callId: string, name: string): ToolResultNode {
+  // DSH 0.1.6-alpha.2 在 isError 之外保留结构化工具错误。
+  // 显式夹具可防止分组逻辑退回只有布尔值的旧契约。
+  return {
+    ...settledTool(callId, name),
+    error: { name: 'ToolError', code: 'FAILED' },
+  }
+}
+
 function tool(key: string, name: string): ChatNode<'tool-call'> {
   return {
     key,
@@ -152,7 +161,16 @@ test('ignores blank reasoning and blank text, but treats visible output as a bou
     assistant('reason', [{ kind: 'reasoning', text: '有效' }]),
     assistant('image', [
       { kind: 'reasoning', text: '准备' },
-      { kind: 'other', block: { source: 'test' } },
+      {
+        kind: 'image',
+        attachment: {
+          attachmentId: 'sha256:test',
+          mediaType: 'image/png',
+          bytes: 1,
+          width: 1,
+          height: 1,
+        } as Extract<AssistantBlock, { kind: 'image' }>['attachment'],
+      },
     ]),
     assistant('text-blank', [
       { kind: 'reasoning', text: '继续' },
@@ -235,6 +253,17 @@ test('counts failures but only reports an error when the final process item fail
   assert.equal(recoveredGroup?.failureCount, 1)
   assert.equal(recoveredGroup?.latestKey, 'recovered')
   assert.deepEqual(recoveredGroup?.members.map(member => member.state), ['done', 'error', 'done'])
+
+  const structured = {
+    ...tool('structured', 'read'),
+    data: { root: structuredErrorTool('structured', 'read') },
+  } satisfies ChatNode<'tool-call'>
+  const structuredGroup = activityGroups(['structured'], nodeStore([structured]))[0]
+  assert.equal(structuredGroup?.failureCount, 1)
+  assert.equal(structuredGroup?.error, true)
+  assert.deepEqual(structuredGroup?.members, [
+    { rowKey: 'structured', kind: 'tool', state: 'error' },
+  ])
 
   const nested = runningTool('parent', 'run_code', [errorTool('child', 'read')])
   const runningGroup = activityGroups(['reason', 'parent'], nodeStore([

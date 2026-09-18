@@ -98,7 +98,7 @@ function reasoningEntries(node: ChatNode<'assistant-step'>): ActivityEntry[] {
   })
 }
 
-/** 解析 DSH 0.1.2-alpha.3 使用的终端结果标记。 */
+/** 解析 DSH 终端结果公开的文本失败标记。 */
 function terminalFailed(block: ToolResultNode): boolean {
   const call = block.call
   if (call === null || (call.name !== 'bash' && call.name !== 'pwsh')) return false
@@ -121,7 +121,7 @@ function terminalFailed(block: ToolResultNode): boolean {
 
 /** 已完成的工具结果才带 kind；子调用参与计数，但只有根调用对应一条顶层官方过程行。 */
 function toolEntries(block: ToolCallBlock, rowKey: string, terminal = true): ActivityEntry[] {
-  const failed = 'kind' in block && (block.isError || terminalFailed(block))
+  const failed = 'kind' in block && (block.isError || block.error !== undefined || terminalFailed(block))
   return [
     {
       rowKey,

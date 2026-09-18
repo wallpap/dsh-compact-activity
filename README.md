@@ -44,7 +44,7 @@
 
 ## 安装
 
-### DSH Desktop 2.0.4
+### DSH Desktop 2.0.12（Beta：2.0.12-beta.1）
 
 从系统托盘打开 DSH Terminal，针对当前 profile 运行：
 
@@ -93,7 +93,7 @@ dsh --profile web --dump-config
 ```text
 请安装并验证最新版 dsh-compact-activity。
 
-1. 如果目标是 DSH Desktop 2.0.4，直接定位并使用 Desktop 提供的 DSH Terminal 程序或启动入口。不要用普通 PowerShell、CMD 或其他终端代替。找不到 DSH Terminal 时停止并报告，不要猜测路径。
+1. 如果目标是 DSH Desktop（稳定版 2.0.12 或 Beta 2.0.12-beta.1），直接定位并使用 Desktop 提供的 DSH Terminal 程序或启动入口。不要用普通 PowerShell、CMD 或其他终端代替。找不到 DSH Terminal 时停止并报告，不要猜测路径。
 2. 在 DSH Terminal 中优先运行 `dsh plugin add dsh-compact-activity@latest`、`dsh --dump-config` 和 `pnpm list dsh-compact-activity --depth 0`。这些命令操作 Desktop 当前 profile，不要添加 `--profile web`。
 3. 用 `pnpm view dsh-compact-activity dist-tags.latest` 查询 npm 最新版本。如果实际安装版本不一致，再运行 `dsh plugin add "dsh-compact-activity@<查询到的版本>"`，不要预先写死版本号。
 4. 只有目标明确是普通 DSH CLI/Web 时，才使用带 `--profile web` 的插件命令。此路径需要 `dsh` 和 `pnpm`；npm 不能代替 pnpm。
@@ -125,7 +125,7 @@ dsh --profile web --dump-config
 
 ## 更新与卸载
 
-Desktop 2.0.4 在 DSH Terminal 中更新或卸载：
+在 DSH Desktop 的 DSH Terminal 中更新或卸载：
 
 ```powershell
 dsh plugin update dsh-compact-activity --latest
@@ -223,10 +223,13 @@ src/
 
 兼容性状态：
 
-| 运行环境                  | 版本                                 | 结果                                     |
-| ------------------------- | ------------------------------------ | ---------------------------------------- |
-| DeepSeek Harness 官方 Web | `0.1.5-rc.2`（master 源码验证）      | 源码兼容；类型检查、jsdom 测试和生产构建通过；真实宿主未回归 |
-| DSH Desktop（Windows）    | `2.0.9`，内置 DSH `0.1.5-rc.1`      | 复用同一 Web Client 契约；内置版本与已验证源码契约面无差异；真实 Desktop 启动和 profile 组合未回归 |
+截至 2026-09-18，以下结果基于本地源码和 Desktop 内置运行时包；尚未启动真实 Electron/Desktop 窗口做人工回归。
+
+| 运行环境 | 版本 | 结果 |
+| -------- | ---- | ---- |
+| DeepSeek Harness 官方 Web | `0.1.6-alpha.2`（commit `ddefc45f`） | 插件开发依赖直接链接本地最新源码；`npm run typecheck` 和 `npm run build` 通过，分组与控制器测试通过。完整 `npm test` 中的性能基准在当前机器负载下偶尔低于 200/300 tops 的阈值；单独运行性能测试可通过。 |
+| 社区 DSH Desktop 稳定版 | `2.0.12`，内置 DSH `0.1.5-rc.2` | `vendor/dsh-runtime/0.1.5-rc.2` 的 Client bundle 仍保留 Chat Flow、Think、Tool 和 Turn-process 标记；未发现源码契约冲突，但真实 Desktop 启动和 profile 组合未回归。 |
+| 社区 DSH Desktop Beta | `2.0.12-beta.1`，内置 DSH `0.1.6-alpha.2` | 与当前官方 Web 源码使用同一 Client 契约；Beta 的内置运行时版本与本地源码一致。真实 Desktop 启动和 profile 组合未回归。 |
 
 Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
@@ -239,6 +242,12 @@ Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 - `assistant-step` 与 `tool-call` Chat Node 数据
 
 语言词典注册到插件自有的 `compact-activity` namespace，状态和计数通过 DSH 注入的 `t` 翻译函数呈现；其余标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互、语言切换和工具实时摘要。
+
+### 图片折叠评估
+
+当前 DSH `0.1.6-alpha.2` 通过 `conversation.message.images` 的单占位 slot 渲染对话图片，但没有提供可组合的图片 slot chain，也没有承诺稳定的图片组 DOM 标记。插件目前只依赖 Chat Flow、Think、Tool 和 Chat Node 契约；`assistant-step` 中的 `image` / `other` 块仍被视为可见正文边界，不会被默认隐藏。
+
+因此本次兼容性更新不直接加入“默认折叠所有图片”。通过 DOM 包装或替换单占位 slot 的临时方案，可能破坏 React 重绘、图片加载器、灯箱交互，也可能误折叠用户输入图片或工具结果图片。更安全的实现需要 DSH 提供图片 chain slot，或类似 `data-message-image-group` 的稳定标记；届时再用原生 `<details>/<summary>` 实现默认收起，并保留官方图片子树和灯箱行为。当前版本的 `conversation.message.images` single slot 不满足这个扩展要求。
 
 ### DSH Desktop 服务边界
 
