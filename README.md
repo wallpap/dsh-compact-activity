@@ -36,6 +36,16 @@
 
 <img width="1149" height="603" alt="image" src="https://github.com/user-attachments/assets/a9fcdba8-c72c-4b79-9171-225b9a2f1e3a" />
 
+-----------
+
+<img width="974" height="773" alt="image" src="https://github.com/user-attachments/assets/2dfd9d9b-ab21-4dd2-8387-416a54577cd3" />
+
+-----------
+
+<img width="998" height="1815" alt="image" src="https://github.com/user-attachments/assets/bcc67898-c5f7-4e80-9fd2-498e93c76ec2" />
+
+
+
 ## 安装
 
 ### DSH Desktop 2.0.12（Beta：2.0.12-beta.1）
