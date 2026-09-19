@@ -243,11 +243,18 @@ Linux 和 macOS 用户也可通过官方 CLI/Web 使用插件。
 
 语言词典注册到插件自有的 `compact-activity` namespace，状态和计数通过 DSH 注入的 `t` 翻译函数呈现；其余标记由 DSH 提供，不属于本插件控制的公共 API。升级 DSH 后，建议人工检查总过程折叠、官方子项交互、语言切换和工具实时摘要。
 
-### 图片折叠评估
+### 图片折叠
 
-当前 DSH `0.1.6-alpha.2` 通过 `conversation.message.images` 的单占位 slot 渲染对话图片，但没有提供可组合的图片 slot chain，也没有承诺稳定的图片组 DOM 标记。插件目前只依赖 Chat Flow、Think、Tool 和 Chat Node 契约；`assistant-step` 中的 `image` / `other` 块仍被视为可见正文边界，不会被默认隐藏。
+非用户输入的图片默认收起，范围包括：
 
-因此本次兼容性更新不直接加入“默认折叠所有图片”。通过 DOM 包装或替换单占位 slot 的临时方案，可能破坏 React 重绘、图片加载器、灯箱交互，也可能误折叠用户输入图片或工具结果图片。更安全的实现需要 DSH 提供图片 chain slot，或类似 `data-message-image-group` 的稳定标记；届时再用原生 `<details>/<summary>` 实现默认收起，并保留官方图片子树和灯箱行为。当前版本的 `conversation.message.images` single slot 不满足这个扩展要求。
+- Assistant 消息中的附件图片和 Markdown 图片；
+- 工具结果中的图片画廊；
+- 其他非 `user` / `steering` Chat Flow 行中的图片展示。
+
+用户输入和 steering 消息中的图片保持原样，不会被插件折叠。插件使用自己的独立标记：`data-dca-image-group`、`data-dca-image-target` 和 `data-dca-image-hidden`。总折叠控制器只插入原生 `<details>/<summary>` 标记，并隐藏原图片目标，不移动、不替换 DSH 的图片 DOM 子树，因此官方图片加载、重试和 lightbox 交互仍由 DSH 管理。
+
+图片检测复用当前 DSH 图片渲染器输出的按钮、Markdown 图片属性和失败图片的降级节点；降级节点的 CSS Module 类名不视为稳定契约，插件同时使用其语义结构识别。升级 DSH 后，应人工检查 Assistant 图片、工具图片、多图画廊、图片加载失败时的降级文本、用户输入图片和 lightbox 展开。
+在 Windows Desktop 中，如果 DSH 将会话工作区下的本地 Markdown 路径（例如 `/Code/...`）降级成斜体替代文本，插件会根据当前 Session 的工作目录补全盘符，并通过已鉴权的 `/api/file` 路由重新挂载图片；无法解析工作目录或文件确实不存在时，保留 DSH 的替代文本。折叠按钮沿用过程行的状态颜色和 SVG 箭头；同一 Markdown 图片引用只生成一个标记，展开后显示斜体加粗的“图片名称（路径）”说明。
 
 ### DSH Desktop 服务边界
 

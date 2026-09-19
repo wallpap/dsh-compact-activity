@@ -1,7 +1,7 @@
 export const STYLE_ID = 'dsh-compact-activity'
 
 /**
- * 仅定义插件添加的总折叠和成员标记；展开后的 DSH 官方过程行沿用原样式。
+ * 仅定义插件添加的总折叠、图片折叠和成员标记；展开后的 DSH 官方内容沿用原样式。
  * hidden 属性负责布局可见性；class 仅保留为插件成员的展示标记。
  */
 export const STYLE_TEXT = String.raw`
@@ -15,6 +15,153 @@ export const STYLE_TEXT = String.raw`
    host's hidden attribute. */
 [data-dca-hidden] {
   display: none !important;
+}
+
+/* Image folding owns only this marker/target pair. The host image subtree is
+   kept in place so its loader and lightbox remain under DSH's control. */
+[data-dca-image-hidden] {
+  display: none !important;
+}
+
+.dca-markdown-image-repair {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.dca-image-group {
+  --dca-state-accent: #39c5bb;
+  --dca-state-ink: color-mix(
+    in srgb,
+    var(--dca-state-accent) 56%,
+    var(--dsw-alias-label-primary)
+  );
+  display: block;
+  min-width: 0;
+  margin: 8px 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dca-image-group-inline {
+  /* Keep the collapsed marker compact without laying its caption beside it. */
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  vertical-align: top;
+}
+
+/* Markdown renders standalone images in paragraphs with a 16px host rhythm.
+   Image-only paragraphs use the plugin's 8px rhythm instead; mixed prose
+   paragraphs retain the host spacing. */
+[data-dca-image-container] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+[data-dca-image-container] + [data-dca-image-container] {
+  margin-top: 8px !important;
+}
+
+[data-dca-image-container] > .dca-image-group-inline {
+  display: block;
+  width: max-content;
+}
+
+[data-dca-image-container] > .dca-image-group-inline[open] {
+  width: 100%;
+}
+
+[data-dca-image-container] > .dca-image-group-inline[open] > .dca-image-details {
+  box-sizing: border-box;
+  width: 100%;
+  margin-left: 0;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.dca-image-group-inline[open] {
+  margin-bottom: 8px;
+}
+
+.dca-image-summary {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 30px;
+  align-items: center;
+  overflow: hidden;
+  padding-right: 8px;
+  list-style: none;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--dca-state-accent) 22%,
+    var(--dsw-alias-label-caption)
+  );
+  border-radius: 9px;
+  background: color-mix(
+    in srgb,
+    var(--dca-state-accent) 4%,
+    var(--dsw-alias-interactive-bg-hover)
+  );
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.dca-image-group-inline .dca-image-summary {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.dca-image-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dca-image-summary:hover,
+.dca-image-group[open] > .dca-image-summary {
+  border-color: color-mix(
+    in srgb,
+    var(--dca-state-accent) 34%,
+    var(--dsw-alias-label-caption)
+  );
+  background: color-mix(
+    in srgb,
+    var(--dca-state-accent) 7%,
+    var(--dsw-alias-interactive-bg-hover)
+  );
+}
+
+.dca-image-summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dca-state-accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.dca-image-label {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dca-image-details {
+  min-width: 0;
+  margin: 6px 0 0 10px;
+  padding: 0 6px 4px 14px;
+}
+
+.dca-image-caption {
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+  text-align: center;
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 20px;
 }
 
 .dca-activity-group {
@@ -144,8 +291,9 @@ export const STYLE_TEXT = String.raw`
   80%, 100% { transform: translateY(255%); }
 }
 
-.dca-marker {
-  position: relative;
+.dca-marker,
+.dca-image-marker-icon {
+  display: block;
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
@@ -153,29 +301,8 @@ export const STYLE_TEXT = String.raw`
   transition: transform 140ms ease;
 }
 
-.dca-marker::before,
-.dca-marker::after {
-  content: '';
-  position: absolute;
-  left: 6px;
-  width: 7px;
-  height: 1.5px;
-  border-radius: 2px;
-  background: currentColor;
-  transform-origin: right center;
-}
-
-.dca-marker::before {
-  top: 6px;
-  transform: rotate(45deg);
-}
-
-.dca-marker::after {
-  top: 11px;
-  transform: rotate(-45deg);
-}
-
-.dca-activity-group[open] .dca-marker {
+.dca-activity-group[open] .dca-marker,
+.dca-image-group[open] .dca-image-marker-icon {
   transform: rotate(90deg);
 }
 
@@ -261,6 +388,18 @@ export const STYLE_TEXT = String.raw`
   transition: background-color 120ms ease;
 }
 
+/* DSH's collapsed flow roots keep a fixed 24px host height. The card adds
+   4px vertical padding on both sides, so reserve the complete 32px box; this
+   keeps the official 24px disclosure row centered instead of overflowing
+   below the card. Use min-height because DSH owns a fixed 24px height on the
+   same root. The plugin-owned marker avoids CSS-module class-name coupling. */
+.dca-activity-member[data-dca-member-collapsed] {
+  min-height: calc(32px + var(--dsh-content-font-delta, 0px)) !important;
+}
+
+
+
+
 .dca-activity-member[data-dca-member-state='running'] {
   --dca-member-accent: #8d78d6;
 }
@@ -322,7 +461,9 @@ export const STYLE_TEXT = String.raw`
 
   .dca-activity-summary,
   .dca-activity-member,
-  .dca-marker {
+  .dca-marker,
+  .dca-image-summary,
+  .dca-image-marker-icon {
     transition: none;
   }
 }

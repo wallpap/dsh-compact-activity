@@ -14,6 +14,8 @@ export type CompactActivityKey =
   | 'count.toolCalls'
   | 'count.failure'
   | 'count.failures'
+  | 'count.image'
+  | 'count.images'
 
 /** 将插件私有文案键并入 slot 的类型注册表，使 t(...) 只能使用已声明的键。 */
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -34,6 +36,8 @@ export const zh: LocaleDictOf<typeof ACTIVITY_NS> = {
   'count.toolCalls': '{count} 次工具调用',
   'count.failure': '{count} 个失败步骤',
   'count.failures': '{count} 个失败步骤',
+  'count.image': '{count} 张图片',
+  'count.images': '{count} 张图片',
 }
 
 export const en: LocaleDictOf<typeof ACTIVITY_NS> = {
@@ -48,4 +52,6 @@ export const en: LocaleDictOf<typeof ACTIVITY_NS> = {
   'count.toolCalls': '{count} tool calls',
   'count.failure': '{count} failed step',
   'count.failures': '{count} failed steps',
+  'count.image': '{count} image',
+  'count.images': '{count} images',
 }

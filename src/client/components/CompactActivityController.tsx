@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 import {
   activityGroups, type ActivityGroup, type ActivityMemberState,
 } from '../activity-group.ts'
@@ -17,15 +18,73 @@ const INLINE_BODY_CLASS = 'dca-activity-inline-body'
 const MEMBER_CLASS = 'dca-activity-member'
 const MEMBER_FIRST_CLASS = 'dca-activity-member-first'
 const MEMBER_LAST_CLASS = 'dca-activity-member-last'
+const MEMBER_COLLAPSED_ATTRIBUTE = 'data-dca-member-collapsed'
 const PLUGIN_HIDDEN_ATTRIBUTE = 'data-dca-hidden'
 const PLUGIN_HIDDEN_DATASET = 'dcaHidden'
 const OFFICIAL_HIDDEN_DATASET = 'dcaOfficialHidden'
 const PLUGIN_MARKER_HIDDEN_DATASET = 'dcaMarkerHidden'
+const IMAGE_MARKER_ATTRIBUTE = 'data-dca-image-group'
+const IMAGE_TARGET_ATTRIBUTE = 'data-dca-image-target'
+const IMAGE_CONTAINER_ATTRIBUTE = 'data-dca-image-container'
+const IMAGE_CONTAINER_DATASET = 'dcaImageContainer'
+const IMAGE_HIDDEN_DATASET = 'dcaImageHidden'
+const IMAGE_MARKER_SIGNATURE_DATASET = 'dcaImageSignature'
+const IMAGE_MARKER_LABELS_DATASET = 'dcaImageLabels'
+const IMAGE_REPAIR_ATTRIBUTE = 'data-dca-image-repair'
+const IMAGE_REPAIR_DATASET = 'dcaImageRepair'
+const IMAGE_REPAIR_FALLBACK_ATTRIBUTE = 'data-dca-image-repair-fallback'
+const IMAGE_REPAIR_FALLBACK_DATASET = 'dcaImageRepairFallback'
+const IMAGE_REPAIR_FAILED_DATASET = 'dcaImageRepairFailed'
+const IMAGE_REPAIR_SOURCE_DATASET = 'dcaImageRepairSource'
+const IMAGE_REPAIR_ORIGINAL_SOURCE_DATASET = 'dcaImageRepairOriginalSource'
+const IMAGE_BUTTON_SELECTOR = [
+  'button[data-variant="single"]',
+  'button[data-variant="tile"]',
+  'button[data-variant="thumbnail"]',
+].join(',')
+const MARKDOWN_IMAGE_SELECTOR = 'img[loading="lazy"][decoding="async"][referrerpolicy="no-referrer"]'
+// dsh-client-ui-primitives replaces rejected or failed Markdown images with a
+// CSS-module span instead of keeping <img>. The class hash is not a stable
+// host contract across bundled DSH versions, so the class selector is only a
+// fast path; isMarkdownImageFallback also recognizes the semantic <p><span>
+// fallback shape used by the renderer.
+const MARKDOWN_IMAGE_ALT_SELECTOR = 'span[class*="imageAlt"]'
+const IMAGE_RELEVANT_ATTRIBUTES = new Set([
+  'data-align',
+  'data-chat-flow-kind',
+  'data-message-attachments',
+  'data-variant',
+  'decoding',
+  'loading',
+  'referrerpolicy',
+])
 
 interface MemberElement {
   readonly element: HTMLElement
   readonly state: ActivityMemberState
 }
+
+interface ImageTarget {
+  readonly element: HTMLElement
+  readonly elements: readonly HTMLElement[]
+  readonly count: number
+  readonly inline: boolean
+  readonly labels: readonly ImageLabel[]
+}
+
+interface ImageLabel {
+  readonly name: string
+  readonly path: string | undefined
+}
+
+interface MarkdownImageReference {
+  readonly source: string
+  readonly alt: string
+}
+
+type MarkdownImageReferences = ReadonlyMap<string, readonly MarkdownImageReference[]>
+
+const MARKDOWN_IMAGE_REFERENCE_PATTERN = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)\n]+))(?:\s+["'][^)]*["'])?\s*\)/gu
 
 /** 宿主 DOM 的实时状态优先，避免快照尚未刷新时将官方错误／停止状态覆盖为完成。 */
 function resolvedMemberState(element: HTMLElement, state: ActivityMemberState): ActivityMemberState {
@@ -74,6 +133,7 @@ function memberElementsIn(
 
 function clearMemberPresentation(element: HTMLElement): void {
   element.classList.remove(MEMBER_CLASS, MEMBER_FIRST_CLASS, MEMBER_LAST_CLASS)
+  element.removeAttribute(MEMBER_COLLAPSED_ATTRIBUTE)
   delete element.dataset['dcaMemberState']
 }
 
@@ -88,10 +148,547 @@ function setPluginHidden(element: HTMLElement, hidden: boolean): void {
   if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
 }
 
+function imageMarkersIn(container: HTMLElement): Map<string, HTMLDetailsElement> {
+  const markers = new Map<string, HTMLDetailsElement>()
+  for (const marker of container.querySelectorAll<HTMLDetailsElement>(`details[${IMAGE_MARKER_ATTRIBUTE}]`)) {
+    const id = marker.dataset['dcaImageGroup'] ?? ''
+    if (markers.has(id)) marker.remove()
+    else markers.set(id, marker)
+  }
+  return markers
+}
+
+function setImageHidden(element: HTMLElement, hidden: boolean): void {
+  if (hidden) {
+    element.dataset[IMAGE_HIDDEN_DATASET] = ''
+    if (!element.hasAttribute('hidden')) element.setAttribute('hidden', '')
+    return
+  }
+  if (element.dataset[IMAGE_HIDDEN_DATASET] === undefined) return
+  delete element.dataset[IMAGE_HIDDEN_DATASET]
+  if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
+}
+
+function isImageContainerChild(node: Node): boolean {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent?.trim() === ''
+  if (!(node instanceof HTMLElement)) return false
+  if (hasMarkdownImageFallback(node)) return true
+  return node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)
+    || node.matches(MARKDOWN_IMAGE_SELECTOR)
+    || node.matches(`[${IMAGE_REPAIR_FALLBACK_ATTRIBUTE}]`)
+    || node.matches('a') && node.querySelector(MARKDOWN_IMAGE_SELECTOR) !== null
+}
+
+/** Return an image-only Markdown paragraph whose host margins can be replaced
+ * by the plugin's 8px image rhythm without changing mixed prose paragraphs. */
+function imageContainerFor(element: HTMLElement): HTMLElement | undefined {
+  const parent = element.parentElement
+  if (parent === null || parent.localName !== 'p') return undefined
+  const children = [...parent.childNodes]
+  return children.length > 0 && children.every(isImageContainerChild) ? parent : undefined
+}
+
+function hasMarkdownImageFallback(element: Element): boolean {
+  return isMarkdownImageFallback(element)
+}
+
+function isMarkdownImageFallback(element: Element): element is HTMLElement {
+  if (element.matches(MARKDOWN_IMAGE_ALT_SELECTOR)) return true
+  if (!(element instanceof HTMLElement) || element.localName !== 'span') return false
+  const paragraph = element.parentElement
+  if (paragraph === null || paragraph.localName !== 'p') return false
+  // A rejected Markdown image is rendered as <p><span>alt</span></p>. Keep the
+  // fallback structural check narrow so ordinary inline spans are not folded.
+  return [...paragraph.childNodes].every(node => node === element
+    || node.nodeType === Node.TEXT_NODE && node.textContent?.trim() === ''
+    || node instanceof HTMLElement && node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`))
+}
+
+function markdownImageReferencesIn(
+  rows: ReadonlyMap<string, HTMLElement>,
+  chat: Readonly<{ nodes: ChatNodeStore }>,
+): MarkdownImageReferences {
+  const references = new Map<string, readonly MarkdownImageReference[]>()
+  for (const row of rows.values()) {
+    if (row.dataset['chatFlowKind'] !== 'assistant-step') continue
+    const node = chat.nodes.get(row.dataset['chatFlowKey'] ?? '') as ChatNode | undefined
+    if (node?.kind !== 'assistant-step') continue
+    const blocks = node.data.blocks
+    const values: MarkdownImageReference[] = []
+    for (const block of blocks) {
+      if (block.kind !== 'text') continue
+      MARKDOWN_IMAGE_REFERENCE_PATTERN.lastIndex = 0
+      for (const match of block.text.matchAll(MARKDOWN_IMAGE_REFERENCE_PATTERN)) {
+        const source = match[2] ?? match[3]
+        if (source === undefined || source.length === 0) continue
+        values.push({ source, alt: match[1] ?? '' })
+      }
+    }
+    if (values.length > 0) references.set(row.dataset['chatFlowKey'] ?? '', values)
+  }
+  return references
+}
+
+function windowsDrive(cwd: string | undefined): string | undefined {
+  const drive = cwd === undefined ? undefined : /^([A-Za-z]:)[\\/]/u.exec(cwd)?.[1]
+  return drive
+}
+
+function normalizeWindowsPath(value: string): string {
+  const normalized = value.replaceAll('/', '\\')
+  const drive = /^[A-Za-z]:/u.exec(normalized)?.[0] ?? ''
+  const parts = normalized.slice(drive.length).split('\\')
+  const stack: string[] = []
+  for (const part of parts) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      stack.pop()
+      continue
+    }
+    stack.push(part)
+  }
+  return `${drive}\\${stack.join('\\')}`
+}
+
+function normalizePosixPath(value: string): string {
+  const absolute = value.startsWith('/')
+  const stack: string[] = []
+  for (const part of value.split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      stack.pop()
+      continue
+    }
+    stack.push(part)
+  }
+  return `${absolute ? '/' : ''}${stack.join('/')}` || (absolute ? '/' : '.')
+}
+
+/** Resolve an authored Markdown path in the current Session's execution world. */
+function resolveMarkdownImagePath(source: string, cwd: string | undefined): string | undefined {
+  const value = source.trim()
+  if (value === '' || /^\/\//u.test(value) || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return undefined
+  const drive = windowsDrive(cwd)
+  if (drive !== undefined && cwd !== undefined) {
+    if (/^[A-Za-z]:[\\/]/u.test(value)) return normalizeWindowsPath(value)
+    if (value.startsWith('/') || value.startsWith('\\')) return normalizeWindowsPath(`${drive}${value}`)
+    return normalizeWindowsPath(`${cwd}\\${value}`)
+  }
+  if (value.startsWith('/')) return normalizePosixPath(value)
+  return cwd === undefined ? undefined : normalizePosixPath(`${cwd}/${value}`)
+}
+
+function fileApiUrl(path: string): string | undefined {
+  const location = globalThis.window?.location
+  if (location === undefined || (location.protocol !== 'http:' && location.protocol !== 'https:')) return undefined
+  const url = new URL('/api/file', location.href)
+  url.searchParams.set('path', path)
+  return url.href
+}
+
+function authoredPathFromImage(image: HTMLImageElement): string | undefined {
+  const source = image.getAttribute('src')
+  if (source === null || source === '') return undefined
+  try {
+    const url = new URL(source, globalThis.window?.location.href)
+    return url.pathname === '/api/file' ? url.searchParams.get('path') ?? undefined : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function repairMarkdownImageElement(image: HTMLImageElement, cwd: string | undefined): void {
+  const authored = authoredPathFromImage(image)
+  if (authored === undefined) return
+  const resolved = resolveMarkdownImagePath(authored, cwd)
+  const url = resolved === undefined ? undefined : fileApiUrl(resolved)
+  if (url === undefined) return
+  if (image.dataset[IMAGE_REPAIR_SOURCE_DATASET] === resolved && image.src === url) return
+  image.dataset[IMAGE_REPAIR_DATASET] = ''
+  image.dataset[IMAGE_REPAIR_SOURCE_DATASET] = resolved
+  image.dataset[IMAGE_REPAIR_ORIGINAL_SOURCE_DATASET] ??= image.getAttribute('src') ?? ''
+  image.src = url
+}
+
+function markdownDisplaysIn(row: HTMLElement): HTMLElement[] {
+  return [...row.querySelectorAll<HTMLElement>(`${MARKDOWN_IMAGE_SELECTOR}, span`)]
+    .filter(element => element.matches(MARKDOWN_IMAGE_SELECTOR)
+      || isMarkdownImageFallback(element)
+        && element.dataset[IMAGE_REPAIR_FALLBACK_DATASET] === undefined)
+}
+
+function imageElementFromDisplay(element: HTMLElement): HTMLImageElement | undefined {
+  if (element.localName === 'img') return element as HTMLImageElement
+  return element.querySelector<HTMLImageElement>('img') ?? undefined
+}
+
+function imageNameFromDisplay(element: HTMLElement): string {
+  const image = imageElementFromDisplay(element)
+  if (image !== undefined && image.alt.trim() !== '') return image.alt.trim()
+  return oneLine(element.textContent) || 'image'
+}
+
+function imagePathFromDisplay(element: HTMLElement): string | undefined {
+  const image = imageElementFromDisplay(element)
+  return image === undefined ? undefined : authoredPathFromImage(image)
+}
+
+function imageReferencePathKey(reference: MarkdownImageReference, cwd: string | undefined): string {
+  return resolveMarkdownImagePath(reference.source, cwd) ?? reference.source.trim()
+}
+
+function imageDisplayPathKey(display: HTMLElement, cwd: string | undefined): string | undefined {
+  const path = imagePathFromDisplay(display)
+  return path === undefined ? undefined : resolveMarkdownImagePath(path, cwd) ?? path
+}
+
+interface MarkdownImageDisplayGroup {
+  readonly key: string
+  readonly displays: readonly HTMLElement[]
+  readonly reference: MarkdownImageReference | undefined
+}
+
+/** Assign every rendered Markdown display to one authored reference. This also
+ * folds transient duplicate DOM displays into one logical image target. */
+function markdownDisplayGroupsIn(
+  row: HTMLElement,
+  references: readonly MarkdownImageReference[],
+  cwd: string | undefined,
+): readonly MarkdownImageDisplayGroup[] {
+  const displays = markdownDisplaysIn(row)
+  if (references.length === 0) {
+    return displays.map((display, index) => ({ key: `display:${index}`, displays: [display], reference: undefined }))
+  }
+
+  const remaining = new Set(displays)
+  const groups: MarkdownImageDisplayGroup[] = []
+  for (const [index, reference] of references.entries()) {
+    const pathKey = imageReferencePathKey(reference, cwd)
+    const alt = oneLine(reference.alt)
+    const matches = [...remaining].filter(display => {
+      const displayPath = imageDisplayPathKey(display, cwd)
+      return displayPath === pathKey
+        || displayPath === undefined && alt !== '' && imageNameFromDisplay(display) === alt
+    })
+    const selected = matches.length > 0 ? matches : [...remaining].slice(0, 1)
+    if (selected.length === 0) continue
+    for (const display of selected) remaining.delete(display)
+    groups.push({ key: `markdown:${pathKey}:${index}`, displays: selected, reference })
+  }
+  return groups
+}
+
+function imageTargetElement(display: HTMLElement): HTMLElement {
+  const image = imageElementFromDisplay(display)
+  if (image === null || image === undefined) return display
+  const anchor = image.closest<HTMLElement>('a')
+  const anchorImages = anchor?.querySelectorAll('img')
+  return anchor !== null
+    && anchorImages !== undefined
+    && anchorImages.length === 1
+    && anchor.textContent?.trim() === ''
+    ? anchor
+    : display
+}
+
+/** Repair Windows root-relative Markdown paths before DSH replaces the image with alt text. */
+function repairMarkdownImages(
+  rows: ReadonlyMap<string, HTMLElement>,
+  references: MarkdownImageReferences,
+  cwd: string | undefined,
+): void {
+  for (const [rowKey, rowReferences] of references) {
+    const row = rows.get(rowKey)
+    if (row === undefined) continue
+    for (const group of markdownDisplayGroupsIn(row, rowReferences, cwd)) {
+      const reference = group.reference
+      if (reference === undefined) continue
+      const resolved = resolveMarkdownImagePath(reference.source, cwd)
+      const url = resolved === undefined ? undefined : fileApiUrl(resolved)
+      if (url === undefined) continue
+      for (const display of group.displays) {
+        if (display.matches(MARKDOWN_IMAGE_SELECTOR)) {
+          repairMarkdownImageElement(display as HTMLImageElement, cwd)
+          continue
+        }
+        const fallback = display
+        if (fallback.dataset[IMAGE_REPAIR_FALLBACK_DATASET] === resolved) continue
+        if (fallback.dataset[IMAGE_REPAIR_FAILED_DATASET] === 'true'
+          && fallback.dataset[IMAGE_REPAIR_SOURCE_DATASET] === resolved) continue
+
+        const image = document.createElement('img')
+        image.className = 'dca-markdown-image-repair'
+        image.src = url
+        image.alt = reference.alt
+        image.setAttribute('loading', 'lazy')
+        image.setAttribute('decoding', 'async')
+        image.setAttribute('referrerpolicy', 'no-referrer')
+        image.dataset[IMAGE_REPAIR_DATASET] = ''
+        image.dataset[IMAGE_REPAIR_SOURCE_DATASET] = resolved
+        image.addEventListener('error', () => {
+          image.remove()
+          delete fallback.dataset[IMAGE_REPAIR_FALLBACK_DATASET]
+          fallback.dataset[IMAGE_REPAIR_FAILED_DATASET] = 'true'
+          setImageHidden(fallback, false)
+        }, { once: true })
+        fallback.dataset[IMAGE_REPAIR_FALLBACK_DATASET] = resolved
+        fallback.dataset[IMAGE_REPAIR_SOURCE_DATASET] = resolved
+        delete fallback.dataset[IMAGE_REPAIR_FAILED_DATASET]
+        fallback.before(image)
+        setImageHidden(fallback, true)
+      }
+    }
+  }
+}
+
+type ImageTargetKey = string | HTMLElement
+
+function imageTargetsIn(
+  container: HTMLElement,
+  rows: ReadonlyMap<string, HTMLElement>,
+  referencesByRow: MarkdownImageReferences,
+  cwd: string | undefined,
+): ReadonlyMap<HTMLElement, readonly ImageTarget[]> {
+  const targetsByRow = new Map<HTMLElement, Map<ImageTargetKey, ImageTarget>>()
+  const rowFor = (element: Element): HTMLElement | undefined => {
+    const row = element.closest<HTMLElement>('[data-chat-flow-key]')
+    if (row === null) return undefined
+    const key = row.dataset['chatFlowKey'] ?? ''
+    return rows.get(key) === row ? row : undefined
+  }
+  const acceptsImages = (row: HTMLElement, element: Element): boolean => {
+    const rowKind = row.dataset['chatFlowKind']
+    if (rowKind === 'user' || rowKind === 'steering') return false
+    return element.closest('[data-message-attachments]') === null
+  }
+  const add = (row: HTMLElement, key: ImageTargetKey, target: ImageTarget): void => {
+    const targets = targetsByRow.get(row) ?? new Map<ImageTargetKey, ImageTarget>()
+    const current = targets.get(key)
+    if (current === undefined) targets.set(key, target)
+    else {
+      targets.set(key, {
+        ...current,
+        elements: [...new Set([...current.elements, ...target.elements])],
+        count: current.count + target.count,
+        labels: [...current.labels, ...target.labels],
+      })
+    }
+    targetsByRow.set(row, targets)
+  }
+
+  // Query the flow once per sync instead of querying every Chat row. This keeps
+  // the image pass cheap during high-frequency streaming updates when no image
+  // is present in most rows.
+  for (const button of container.querySelectorAll<HTMLElement>(IMAGE_BUTTON_SELECTOR)) {
+    const row = rowFor(button)
+    if (row === undefined || !acceptsImages(row, button)) continue
+    const gallery = button.closest<HTMLElement>('[data-align]') ?? button
+    const buttons = [...gallery.querySelectorAll<HTMLElement>(IMAGE_BUTTON_SELECTOR)]
+    if (buttons.length === 0 || button !== buttons[0]) continue
+    add(row, gallery, {
+      element: gallery,
+      elements: [gallery],
+      count: buttons.length,
+      inline: false,
+      labels: buttons.map(item => ({ name: imageNameFromDisplay(item), path: imagePathFromDisplay(item) })),
+    })
+  }
+
+  for (const row of rows.values()) {
+    const rowKey = row.dataset['chatFlowKey'] ?? ''
+    const references = referencesByRow.get(rowKey) ?? []
+    for (const group of markdownDisplayGroupsIn(row, references, cwd)) {
+      const firstDisplay = group.displays[0]
+      if (firstDisplay === undefined || !acceptsImages(row, firstDisplay)) continue
+      const elements = [...new Set(group.displays.map(imageTargetElement))]
+      const element = elements[0]
+      if (element === undefined) continue
+      const reference = group.reference
+      const label = reference === undefined
+        ? { name: imageNameFromDisplay(element), path: imagePathFromDisplay(element) }
+        : { name: oneLine(reference.alt) || imageNameFromDisplay(element), path: reference.source }
+      add(row, group.key, { element, elements, count: 1, inline: true, labels: [label] })
+    }
+  }
+
+  return new Map([...targetsByRow.entries()].map(([row, targets]) => [
+    row,
+    [...targets.values()].sort((left, right) => {
+      const position = left.element.compareDocumentPosition(right.element)
+      return position & 4 /* Node.DOCUMENT_POSITION_FOLLOWING */ ? -1 : 1
+    }),
+  ]))
+}
+
+function imageLabel(count: number, t: ActivityTranslate): string {
+  return t(count === 1 ? 'count.image' : 'count.images', { count })
+}
+
+function imageSummaryLabel(target: ImageTarget, t: ActivityTranslate): string {
+  const first = target.labels[0]
+  if (target.count === 1 && first !== undefined) {
+    return oneLine(first.name) || first.path || imageLabel(target.count, t)
+  }
+  return imageLabel(target.count, t)
+}
+
+function imageCaption(label: ImageLabel, fallback: string): string {
+  const name = oneLine(label.name) || label.path || fallback
+  return label.path === undefined ? name : `${name}（${label.path}）`
+}
+
+function imageLabelsFromMarker(marker: HTMLDetailsElement): readonly ImageLabel[] {
+  const raw = marker.dataset[IMAGE_MARKER_LABELS_DATASET]
+  if (raw === undefined) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap(item => {
+      if (typeof item !== 'object' || item === null) return []
+      const value = item as { name?: unknown; path?: unknown }
+      const name = typeof value.name === 'string' ? value.name : ''
+      const path = typeof value.path === 'string' ? value.path : undefined
+      return name !== '' || path !== undefined ? [{ name, path }] : []
+    })
+  } catch {
+    return []
+  }
+}
+
+function setImageMarkerText(
+  marker: HTMLDetailsElement,
+  target: ImageTarget,
+  t: ActivityTranslate,
+): void {
+  const label = imageSummaryLabel(target, t)
+  const labels = target.labels.length > 0 ? target.labels : [{ name: label, path: undefined }]
+  const captionText = labels.map(item => imageCaption(item, label)).join(' / ')
+  const signature = JSON.stringify([label, captionText, target.inline, labels])
+  if (marker.dataset[IMAGE_MARKER_SIGNATURE_DATASET] === signature) return
+  marker.dataset[IMAGE_MARKER_SIGNATURE_DATASET] = signature
+  marker.dataset[IMAGE_MARKER_LABELS_DATASET] = JSON.stringify(labels)
+  marker.dataset['dcaImageCount'] = String(target.count)
+  marker.dataset['dcaImageInline'] = String(target.inline)
+  marker.classList.toggle('dca-image-group-inline', target.inline)
+  marker.replaceChildren()
+
+  const summary = document.createElement('summary')
+  summary.className = 'dca-image-summary'
+  summary.title = captionText
+
+  const stateRail = document.createElement('span')
+  stateRail.className = 'dca-state-rail'
+  stateRail.setAttribute('aria-hidden', 'true')
+
+  const arrow = disclosureIcon('dca-image-marker-icon')
+  const text = document.createElement('span')
+  text.className = 'dca-label dca-image-label'
+  text.textContent = label
+  summary.append(stateRail, arrow, text)
+  marker.append(summary)
+
+  const details = document.createElement('div')
+  details.className = 'dca-image-details'
+  for (const item of labels) {
+    const caption = document.createElement('div')
+    caption.className = 'dca-image-caption'
+    caption.textContent = imageCaption(item, label)
+    details.append(caption)
+  }
+  marker.append(details)
+}
+
+function syncImageLabelsIn(container: HTMLElement, t: ActivityTranslate): void {
+  for (const marker of imageMarkersIn(container).values()) {
+    const count = Number(marker.dataset['dcaImageCount'])
+    if (!Number.isInteger(count) || count < 1) continue
+    setImageMarkerText(marker, {
+      element: marker,
+      elements: [marker],
+      count,
+      inline: marker.dataset['dcaImageInline'] === 'true',
+      labels: imageLabelsFromMarker(marker),
+    }, t)
+  }
+}
+
+function setImageTargetHidden(target: ImageTarget, hidden: boolean): void {
+  for (const element of target.elements) setImageHidden(element, hidden)
+}
+
+/**
+ * Fold non-user images without moving or replacing the host's image subtree.
+ * The marker is an independent details element; the original gallery/image
+ * remains in React's DOM position and is only hidden until the marker opens.
+ */
+function syncImageGroups(
+  container: HTMLElement,
+  rows: ReadonlyMap<string, HTMLElement>,
+  t: ActivityTranslate,
+  referencesByRow: MarkdownImageReferences,
+  cwd: string | undefined,
+): void {
+  const targetsByRow = imageTargetsIn(container, rows, referencesByRow, cwd)
+  const candidates = [...rows.values()].flatMap(row => {
+    const rowKey = row.dataset['chatFlowKey'] ?? ''
+    return (targetsByRow.get(row) ?? []).map((target, index) => ({
+      id: `${rowKey}:image:${index}`,
+      target,
+    }))
+  })
+  const activeIds = new Set(candidates.map(candidate => candidate.id))
+  const activeTargets = new Set(candidates.flatMap(candidate => candidate.target.elements))
+  const activeContainers = new Set<HTMLElement>()
+  for (const candidate of candidates) {
+    const imageContainer = imageContainerFor(candidate.target.element)
+    if (imageContainer !== undefined) activeContainers.add(imageContainer)
+  }
+  for (const imageContainer of container.querySelectorAll<HTMLElement>(`[${IMAGE_CONTAINER_ATTRIBUTE}]`)) {
+    if (!activeContainers.has(imageContainer)) delete imageContainer.dataset[IMAGE_CONTAINER_DATASET]
+  }
+  for (const imageContainer of activeContainers) imageContainer.dataset[IMAGE_CONTAINER_DATASET] = ''
+
+  const markers = imageMarkersIn(container)
+
+  for (const target of container.querySelectorAll<HTMLElement>(`[${IMAGE_TARGET_ATTRIBUTE}]`)) {
+    if (!activeTargets.has(target)) {
+      setImageHidden(target, false)
+      delete target.dataset['dcaImageTarget']
+    }
+  }
+  for (const [id, marker] of markers) {
+    if (!activeIds.has(id)) marker.remove()
+  }
+
+  for (const candidate of candidates) {
+    const { id, target } = candidate
+    for (const element of target.elements) element.dataset['dcaImageTarget'] = id
+    let marker = markers.get(id)
+    if (marker === undefined) {
+      marker = document.createElement('details')
+      marker.className = 'dca-image-group'
+      marker.dataset['dcaImageGroup'] = id
+      markers.set(id, marker)
+    }
+    const currentMarker = marker
+    currentMarker.ontoggle = () => {
+      setImageTargetHidden(target, !currentMarker.open)
+    }
+    setImageMarkerText(currentMarker, target, t)
+    if (currentMarker.nextElementSibling !== target.element) target.element.before(currentMarker)
+    setImageTargetHidden(target, !currentMarker.open)
+  }
+}
+
 /**
  * 为本组的官方过程项附加展示标记。嵌套工具调用只参与计数，仍由根工具组件
  * 保持自己的官方层级，因此不会在这里生成第二个顶层子项。
  */
+function memberDisclosureOpen(element: HTMLElement): boolean {
+  if (element.dataset['variant'] === 'think') return element.hasAttribute('data-expanded')
+  return element.querySelector('[data-open]') !== null
+}
+
 function syncGroupMembers(
   rows: ReadonlyMap<string, HTMLElement>,
   group: ActivityGroup,
@@ -112,6 +709,7 @@ function syncGroupMembers(
     if (member.element.dataset['dcaMemberState'] !== member.state) {
       member.element.dataset['dcaMemberState'] = member.state
     }
+    member.element.toggleAttribute(MEMBER_COLLAPSED_ATTRIBUTE, !memberDisclosureOpen(member.element))
   }
 }
 
@@ -284,6 +882,23 @@ function countItems(group: ActivityGroup, t: ActivityTranslate): readonly CountI
   return items
 }
 
+function disclosureIcon(className: string): SVGSVGElement {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  icon.classList.add(className)
+  icon.setAttribute('viewBox', '0 0 20 20')
+  icon.setAttribute('fill', 'none')
+  icon.setAttribute('stroke', 'currentColor')
+  icon.setAttribute('stroke-width', '1.8')
+  icon.setAttribute('stroke-linecap', 'round')
+  icon.setAttribute('stroke-linejoin', 'round')
+  icon.setAttribute('aria-hidden', 'true')
+  icon.setAttribute('focusable', 'false')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', 'M7 4.5 13 10l-6 5.5')
+  icon.append(path)
+  return icon
+}
+
 function countIcon(kind: CountKind): SVGSVGElement {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   const outline = kind !== 'reasoning'
@@ -327,9 +942,7 @@ function setMarkerText(
   stateRail.className = 'dca-state-rail'
   stateRail.setAttribute('aria-hidden', 'true')
 
-  const arrow = document.createElement('span')
-  arrow.className = 'dca-marker'
-  arrow.setAttribute('aria-hidden', 'true')
+  const arrow = disclosureIcon('dca-marker')
 
   const label = document.createElement('span')
   label.className = 'dca-label'
@@ -376,8 +989,17 @@ function setMarkerText(
  * 只同步一个可见 Chat Flow。完整组必须都位于该流中，避免在保留的其他会话流
  * 插入跨会话的总折叠。
  */
-function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[], t: ActivityTranslate): void {
+function syncContainer(
+  container: HTMLElement,
+  groups: readonly ActivityGroup[],
+  t: ActivityTranslate,
+  syncImages: boolean,
+  syncImageLabels: boolean,
+  chat: Readonly<{ nodes: ChatNodeStore }>,
+  sessionCwd: string | undefined,
+): void {
   const rows = rowsIn(container)
+  const imageReferences = markdownImageReferencesIn(rows, chat)
   const orderedRows = [...rows.values()]
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
   const activeKeys = new Set(visibleGroups.flatMap(group => group.keys))
@@ -421,7 +1043,7 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
       first.before(marker)
     }
     marker.ontoggle = () => {
-      syncContainer(container, groups, t)
+      syncContainer(container, groups, t, false, false, chat, sessionCwd)
     }
     setMarkerText(marker, group, liveSummary(rows, group, t), t)
     syncOfficialTurnVisibility(container, marker, group, rows)
@@ -430,15 +1052,26 @@ function syncContainer(container: HTMLElement, groups: readonly ActivityGroup[],
     syncGroupSpacing(marker, group, orderedRows)
   }
   syncOfficialHiddenRows(rows)
+  if (syncImages) {
+    repairMarkdownImages(rows, imageReferences, sessionCwd)
+    syncImageGroups(container, rows, t, imageReferences, sessionCwd)
+  } else if (syncImageLabels) syncImageLabelsIn(container, t)
   for (const member of container.querySelectorAll<HTMLElement>(`.${MEMBER_CLASS}`)) {
     if (!liveMembers.has(member)) clearMemberPresentation(member)
   }
 }
 
-function sync(groups: readonly ActivityGroup[], t: ActivityTranslate): void {
+function sync(
+  groups: readonly ActivityGroup[],
+  t: ActivityTranslate,
+  syncImages: boolean,
+  syncImageLabels: boolean,
+  chat: Readonly<{ nodes: ChatNodeStore }>,
+  sessionCwd: string | undefined,
+): void {
   // 页面可以同时保留多个会话流；每个流按自己的可见行独立同步。
   for (const container of document.querySelectorAll<HTMLElement>('[data-chat-flow]')) {
-    syncContainer(container, groups, t)
+    syncContainer(container, groups, t, syncImages, syncImageLabels, chat, sessionCwd)
   }
 }
 
@@ -453,6 +1086,32 @@ function isInChatFlow(node: Node): boolean {
 
 function containsChatFlow(node: Node): boolean {
   return isElement(node) && (node.matches('[data-chat-flow]') || node.querySelector('[data-chat-flow]') !== null)
+}
+
+function containsImageDisplay(node: Node): boolean {
+  if (!isElement(node)) return false
+  return node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)
+    || node.matches(IMAGE_BUTTON_SELECTOR)
+    || node.matches(MARKDOWN_IMAGE_SELECTOR)
+    || isMarkdownImageFallback(node)
+    || node.querySelector(IMAGE_BUTTON_SELECTOR) !== null
+    || node.querySelector(MARKDOWN_IMAGE_SELECTOR) !== null
+    || [...node.querySelectorAll('span')].some(isMarkdownImageFallback)
+}
+
+function affectsImages(records: readonly MutationRecord[]): boolean {
+  return records.some(record => {
+    if (record.type === 'childList') {
+      // The marker owns a summary and caption subtree. Those internal updates
+      // are not image-display changes; only mounting/removing the marker itself
+      // should request an image rescan.
+      if (isElement(record.target) && record.target.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)) return false
+      return [...record.addedNodes, ...record.removedNodes].some(containsImageDisplay)
+    }
+    return record.type === 'attributes'
+      && record.attributeName !== null
+      && IMAGE_RELEVANT_ATTRIBUTES.has(record.attributeName)
+  })
 }
 
 /**
@@ -482,28 +1141,66 @@ function cleanup(): void {
   for (const member of document.querySelectorAll<HTMLElement>(`.${MEMBER_CLASS}`)) {
     clearMemberPresentation(member)
   }
+  for (const element of document.querySelectorAll<HTMLElement>(`[${IMAGE_CONTAINER_ATTRIBUTE}]`)) {
+    delete element.dataset[IMAGE_CONTAINER_DATASET]
+  }
+  for (const target of document.querySelectorAll<HTMLElement>(`[${IMAGE_TARGET_ATTRIBUTE}]`)) {
+    setImageHidden(target, false)
+    delete target.dataset['dcaImageTarget']
+  }
+  for (const image of document.querySelectorAll<HTMLImageElement>(`img[${IMAGE_REPAIR_ATTRIBUTE}]`)) {
+    if (image.classList.contains('dca-markdown-image-repair')) image.remove()
+    else {
+      const original = image.dataset[IMAGE_REPAIR_ORIGINAL_SOURCE_DATASET]
+      if (original !== undefined) image.setAttribute('src', original)
+    }
+    delete image.dataset[IMAGE_REPAIR_DATASET]
+    delete image.dataset[IMAGE_REPAIR_SOURCE_DATASET]
+    delete image.dataset[IMAGE_REPAIR_ORIGINAL_SOURCE_DATASET]
+  }
+  for (const fallback of document.querySelectorAll<HTMLElement>(`[${IMAGE_REPAIR_FALLBACK_ATTRIBUTE}]`)) {
+    setImageHidden(fallback, false)
+    delete fallback.dataset[IMAGE_REPAIR_FALLBACK_DATASET]
+    delete fallback.dataset[IMAGE_REPAIR_SOURCE_DATASET]
+    delete fallback.dataset[IMAGE_REPAIR_FAILED_DATASET]
+  }
   for (const marker of document.querySelectorAll<HTMLElement>(`[${MARKER_ATTRIBUTE}]`)) marker.remove()
+  for (const marker of document.querySelectorAll<HTMLElement>(`[${IMAGE_MARKER_ATTRIBUTE}]`)) marker.remove()
 }
 
 /**
- * 只向 DOM 添加总折叠。官方 DSH 过程行仍是实际内容，展开后的子项继续使用
+ * 只向 DOM 添加总折叠和图片折叠标记。官方 DSH 内容仍是实际内容，展开后的子项继续使用
  * 官方渲染器、样式及交互。
  */
 export function CompactActivityController(props: ControllerProps): null {
-  const { useChat, t } = props
+  const { sessionId, useChat, useSessions, t } = props
   const chat = useChat(snapshot => snapshot)
+  const sessionCwd = useSessions(snapshot => snapshot.byId[sessionId]?.cwd)
   const groups = activityGroups(chat.order, chat.nodes)
   const groupsRef = useRef<readonly ActivityGroup[]>(groups)
+  const chatRef = useRef(chat)
+  const sessionCwdRef = useRef<string | undefined>(sessionCwd)
   const tRef = useRef(t)
+  const imageLocaleSignature = `${t('count.image', { count: 1 })}\u0000${t('count.images', { count: 2 })}`
+  const imageLocaleRef = useRef(imageLocaleSignature)
+  const imageLocaleChanged = imageLocaleRef.current !== imageLocaleSignature
   groupsRef.current = groups
+  chatRef.current = chat
+  sessionCwdRef.current = sessionCwd
   tRef.current = t
-  const scheduleRef = useRef<(() => void) | undefined>(undefined)
+  imageLocaleRef.current = imageLocaleSignature
+  const scheduleRef = useRef<((imagesDirty?: boolean, imageLabelsDirty?: boolean) => void) | undefined>(undefined)
+  const imageDirtyRef = useRef(true)
+  const imageLabelsDirtyRef = useRef(true)
 
   useEffect(() => {
     const schedule = scheduleRef.current
-    if (schedule === undefined) sync(groupsRef.current, tRef.current)
-    else schedule()
-  }, [groups, t])
+    if (schedule === undefined) {
+      sync(groupsRef.current, tRef.current, true, true, chat, sessionCwd)
+      imageDirtyRef.current = false
+      imageLabelsDirtyRef.current = false
+    } else schedule(false, imageLocaleChanged)
+  }, [chat, groups, imageLocaleChanged, sessionCwd, t])
 
   useEffect(() => {
     let queued = false
@@ -512,9 +1209,15 @@ export function CompactActivityController(props: ControllerProps): null {
     const flush = (): void => {
       queued = false
       frame = undefined
-      if (active) sync(groupsRef.current, tRef.current)
+      const syncImages = imageDirtyRef.current
+      const syncImageLabels = imageLabelsDirtyRef.current
+      imageDirtyRef.current = false
+      imageLabelsDirtyRef.current = false
+      if (active) sync(groupsRef.current, tRef.current, syncImages, syncImageLabels, chatRef.current, sessionCwdRef.current)
     }
-    const schedule = (): void => {
+    const schedule = (imagesDirty = false, imageLabelsDirty = false): void => {
+      if (imagesDirty) imageDirtyRef.current = true
+      if (imageLabelsDirty) imageLabelsDirtyRef.current = true
       if (queued) return
       queued = true
       // 同一帧的流式 DOM 变更合并处理，并经由 ref 读取最新 React 快照和本地化函数。
@@ -525,14 +1228,28 @@ export function CompactActivityController(props: ControllerProps): null {
     // ponytail: DSH 当前只通过稳定 DOM 标记暴露跨行分组能力；若官方增加过程组
     // slot，应删除此观察器并直接接入该 slot。
     const observer = new MutationObserver(records => {
-      if (affectsChatFlow(records)) schedule()
+      if (affectsChatFlow(records)) schedule(affectsImages(records))
     })
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['data-state', 'aria-expanded', 'hidden', 'data-turn-process-hidden'],
+      attributeFilter: [
+        'aria-expanded',
+        'data-expanded',
+        'data-open',
+        'data-align',
+        'data-chat-flow-kind',
+        'data-message-attachments',
+        'data-state',
+        'data-turn-process-hidden',
+        'data-variant',
+        'decoding',
+        'hidden',
+        'loading',
+        'referrerpolicy',
+      ],
     })
     return () => {
       active = false

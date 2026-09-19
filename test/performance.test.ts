@@ -167,6 +167,8 @@ function renderFixture(historyRows = HISTORY_ROWS, controlFrames = false): Strea
     const currentNodes = [...nodes, assistant(running.key, text, 'running')]
     const snapshot = { order: currentNodes.map(node => node.key), nodes: nodeStore(currentNodes) }
     const props = {
+      sessionId: 'session',
+      useSessions: (select: (value: { byId: Record<string, { cwd?: string }> }) => unknown) => select({ byId: {} }),
       useChat: (select: (value: typeof snapshot) => unknown) => select(snapshot),
       t: (key: string, params?: Record<string, unknown>) => {
         const template = en[key as keyof typeof en] ?? key

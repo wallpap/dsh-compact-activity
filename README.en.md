@@ -243,11 +243,18 @@ The plugin relies on the following DSH Web extension points and stable markers:
 
 The dictionaries register in the plugin-owned `compact-activity` namespace, and statuses and counts render through DSH's injected `t` translator; the other markers are provided by DSH and are not a public API controlled by this plugin. After upgrading DSH, manually check top-level grouping, official sub-item interactions, language switching, and live tool summaries.
 
-### Image-folding assessment
+### Image folding
 
-Current DSH `0.1.6-alpha.2` renders conversation images through the single `conversation.message.images` slot, but it does not expose a composable image-slot chain or a promised stable image-group DOM marker. The plugin currently relies only on the Chat Flow, Think, Tool, and Chat Node contracts; `image` / `other` blocks in an `assistant-step` remain visible-content boundaries and are not hidden by default.
+Non-user-input images are collapsed by default, including:
 
-For that reason, this compatibility update does not add a default “fold all images” mode. A temporary DOM wrapper or single-slot replacement could break React reconciliation, the authorized image loader, lightbox interactions, or accidentally fold user attachments and tool-result images. A safe implementation needs an upstream image chain slot or a stable marker such as `data-message-image-group`; then the plugin can add a native `<details>/<summary>` with the official image subtree and lightbox behavior intact. The current single `conversation.message.images` slot does not provide that extension seam.
+- attachment images and Markdown images in Assistant messages;
+- image galleries returned by tools;
+- image displays in other Chat Flow rows that are not `user` or `steering` messages.
+
+Images in user and steering messages remain unchanged. The plugin uses independent markers: `data-dca-image-group`, `data-dca-image-target`, and `data-dca-image-hidden`. The controller inserts only native `<details>/<summary>` markers and hides the original image target; it does not move or replace DSH's image DOM subtree, so the host continues to own image loading, retry, and lightbox behavior.
+
+Image detection reuses the current DSH renderer's image buttons, Markdown-image attributes, and the fallback node used for failed images. Its CSS-module class name is not treated as a stable contract; the plugin also recognizes the renderer's semantic fallback shape. After upgrading DSH, manually check Assistant images, tool images, multi-image galleries, failed-image fallback text, user-input images, and lightbox expansion.
+On Windows Desktop, when DSH falls back to italic text for a local Markdown path under the Session workspace (for example `/Code/...`), the plugin uses the current Session working directory to restore the drive-qualified path and remounts the image through the authenticated `/api/file` route. If the working directory cannot be resolved or the file is actually missing, DSH's fallback text is retained. Image markers reuse the process-row status colors and SVG chevron; one marker is created per Markdown image reference, and expanded markers show a bold italic “image name (path)” caption.
 
 ### DSH Desktop service boundary
 

@@ -14,13 +14,14 @@ let root: Root | undefined
 
 function installDom(): HTMLElement {
   // jsdom 不会自动暴露控制器依赖的浏览器全局对象，测试仅安装这几个 API。
-  dom = new JSDOM('<!doctype html><body><div id="root"></div></body>')
+  dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', { url: 'http://127.0.0.1:43120/' })
   Object.assign(globalThis, {
     window: dom.window,
     document: dom.window.document,
     MutationObserver: dom.window.MutationObserver,
     HTMLElement: dom.window.HTMLElement,
     HTMLDetailsElement: dom.window.HTMLDetailsElement,
+    Node: dom.window.Node,
     IS_REACT_ACT_ENVIRONMENT: true,
   })
   const style = dom.window.document.createElement('style')
@@ -97,7 +98,46 @@ function store(nodes: readonly ChatNode[]): ChatNodeStore {
   return { get: key => byKey.get(key), values: () => [...nodes] }
 }
 
-function render(nodes: readonly ChatNode[], dictionary: typeof en = en, officialOpen?: boolean): HTMLElement {
+function imageGallery(count = 1): HTMLDivElement {
+  const gallery = document.createElement('div')
+  gallery.dataset['align'] = 'start'
+  for (let index = 0; index < count; index++) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.dataset['variant'] = 'tile'
+    const image = document.createElement('img')
+    image.alt = `image-${index}`
+    button.append(image)
+    gallery.append(button)
+  }
+  return gallery
+}
+
+function markdownImage(): HTMLImageElement {
+  const image = document.createElement('img')
+  image.setAttribute('loading', 'lazy')
+  image.setAttribute('decoding', 'async')
+  image.setAttribute('referrerpolicy', 'no-referrer')
+  image.alt = 'markdown image'
+  return image
+}
+
+function markdownImageFallback(): HTMLSpanElement {
+  const fallback = document.createElement('span')
+  // dsh-client-ui-primitives renders failed or rejected Markdown images as
+  // a CSS-module span instead of leaving an <img> in the DOM. The production
+  // hash differs between DSH bundles, so this fixture intentionally does not
+  // rely on the source class name.
+  fallback.className = '_fallback_404681'
+  fallback.textContent = 'markdown image fallback'
+  return fallback
+}
+
+function waitForMutationFlush(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
+
+function render(nodes: readonly ChatNode[], dictionary: typeof en = en, officialOpen?: boolean, cwd?: string): HTMLElement {
   const container = installDom()
   const flow = document.createElement('div')
   flow.dataset['chatFlow'] = ''
@@ -110,6 +150,7 @@ function render(nodes: readonly ChatNode[], dictionary: typeof en = en, official
   for (const node of nodes) {
     const row = document.createElement('div')
     row.dataset['chatFlowKey'] = node.key
+    row.dataset['chatFlowKind'] = node.kind
     row.dataset['chatTurn'] = '1'
     if (officialOpen === false && (node.kind === 'tool-call'
       || node.kind === 'assistant-step' && node.data.blocks.every(block => block.kind === 'reasoning'))) {
@@ -159,6 +200,10 @@ function render(nodes: readonly ChatNode[], dictionary: typeof en = en, official
   // 夹具只复现插件依赖的稳定 DSH DOM 标记，不复制官方过程行的渲染实现。
   const snapshot = { order: nodes.map(node => node.key), nodes: store(nodes) }
   const props = {
+    sessionId: 'session',
+    useSessions: (select: (value: { byId: Record<string, { cwd?: string }> }) => unknown) => select({
+      byId: cwd === undefined ? {} : { session: { cwd } },
+    }),
     useChat: (select: (value: typeof snapshot) => unknown) => select(snapshot),
     t: (key: string, params?: Record<string, unknown>) => {
       const template = dictionary[key as keyof typeof dictionary] ?? key
@@ -198,7 +243,218 @@ test('mirrors the official Turn disclosure and uses native hidden ownership', as
   assert.equal(row.dataset['dcaHidden'], undefined)
 })
 
-test('inserts a collapsed marker, preserves mixed output, and expands children', () => {
+test('folds non-user image displays while preserving user input images', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+    tool('tool'),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  const toolRow = flow.querySelector<HTMLElement>('[data-chat-flow-key="tool"]')
+  assert.ok(answer)
+  assert.ok(toolRow)
+
+  const assistantGallery = imageGallery(1)
+  answer.append(assistantGallery, markdownImage())
+  const toolGallery = imageGallery(2)
+  toolRow.append(toolGallery)
+
+  const userRow = document.createElement('div')
+  userRow.dataset['chatFlowKey'] = 'user-input'
+  userRow.dataset['chatFlowKind'] = 'user'
+  const userAttachments = document.createElement('div')
+  userAttachments.dataset['messageAttachments'] = ''
+  const userGallery = imageGallery(1)
+  userAttachments.append(userGallery)
+  userRow.append(userAttachments)
+  flow.append(userRow)
+  await waitForMutationFlush()
+
+  const markers = flow.querySelectorAll<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.equal(markers.length, 3)
+  assert.equal(assistantGallery.hidden, true)
+  assert.equal(toolGallery.hidden, true)
+  assert.equal(userGallery.hidden, false)
+  assert.equal(userRow.querySelector('details[data-dca-image-group]'), null)
+  assert.equal(flow.querySelectorAll('[data-dca-image-target]').length, 3)
+  assert.match(toolRow.querySelector('details[data-dca-image-group]')?.textContent ?? '', /2 images/)
+
+  const assistantMarker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.ok(assistantMarker)
+  assistantMarker.open = true
+  assistantMarker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(assistantGallery.hidden, false)
+})
+
+test('folds Markdown image fallback text when the host renders no img element', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const fallback = markdownImageFallback()
+  const fallbackParagraph = document.createElement('p')
+  fallbackParagraph.append(fallback)
+  answer.append(fallbackParagraph)
+  await waitForMutationFlush()
+
+  const marker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.ok(marker)
+  assert.equal(marker.querySelector('.dca-image-label')?.textContent, 'markdown image fallback')
+  assert.equal(marker.querySelector('.dca-image-caption')?.textContent, 'markdown image fallback')
+  assert.equal(fallback.hidden, true)
+  assert.equal(fallback.dataset['dcaImageTarget'], 'answer:image:0')
+
+  marker.open = true
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(fallback.hidden, false)
+})
+
+test('deduplicates repeated Markdown image displays and labels each image', async () => {
+  const firstSource = '/Code/dsh-plugin2/img-0D6FFE13.jpg'
+  const secondSource = '/Code/dsh-plugin2/img-DAC5337D.jpg'
+  const firstAlt = '银白发红瞳角色特写'
+  const secondAlt = 'Cure Arcana 魔法少女立绘'
+  const flow = render([
+    assistant('answer', [{
+      kind: 'text',
+      text: `![${firstAlt}](${firstSource})\n\n![${secondAlt}](${secondSource})`,
+    }]),
+  ], en, undefined, 'E:\\Code\\dsh-plugin2')
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  for (const [alt, source] of [[firstAlt, firstSource], [secondAlt, secondSource]] as const) {
+    for (let copy = 0; copy < 2; copy++) {
+      const image = markdownImage()
+      image.alt = alt
+      image.src = `http://127.0.0.1:43120/api/file?path=${encodeURIComponent(source)}`
+      answer.append(image)
+    }
+  }
+  await waitForMutationFlush()
+
+  const markers = [...answer.querySelectorAll<HTMLDetailsElement>('details[data-dca-image-group]')]
+  assert.equal(markers.length, 2)
+  assert.deepEqual(markers.map(marker => marker.querySelector('.dca-image-label')?.textContent), [firstAlt, secondAlt])
+  assert.equal(markers.every(marker => marker.querySelector('svg.dca-image-marker-icon') !== null), true)
+  assert.deepEqual(
+    markers.map(marker => marker.querySelector('.dca-image-caption')?.textContent),
+    [`${firstAlt}（${firstSource}）`, `${secondAlt}（${secondSource}）`],
+  )
+  assert.equal([...answer.querySelectorAll<HTMLImageElement>('img')].every(image => image.hidden), true)
+
+  const firstMarker = markers[0]
+  assert.ok(firstMarker)
+  firstMarker.open = true
+  firstMarker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal([...answer.querySelectorAll<HTMLImageElement>(`img[alt="${firstAlt}"]`)].every(image => !image.hidden), true)
+  assert.equal([...answer.querySelectorAll<HTMLImageElement>(`img[alt="${secondAlt}"]`)].every(image => image.hidden), true)
+
+  answer.append(firstMarker.cloneNode(true))
+  await waitForMutationFlush()
+  assert.equal(answer.querySelectorAll('details[data-dca-image-group]').length, 2)
+})
+
+test('keeps Markdown image disclosures vertical, 8px apart, and edge-aligned', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const image = markdownImage()
+  const paragraph = document.createElement('p')
+  paragraph.append(image)
+  const secondImage = markdownImage()
+  const secondParagraph = document.createElement('p')
+  secondParagraph.append(secondImage)
+  answer.append(paragraph, secondParagraph)
+  await waitForMutationFlush()
+
+  const markers = [...answer.querySelectorAll<HTMLDetailsElement>('details[data-dca-image-group]')]
+  assert.equal(markers.length, 2)
+  const marker = markers[0]
+  assert.ok(marker)
+  const style = dom!.window.getComputedStyle(marker)
+  assert.equal(style.display, 'block')
+  assert.equal(style.marginLeft, '0px')
+  assert.equal(style.marginRight, '0px')
+  assert.equal(style.marginBottom, '0px')
+  assert.equal(marker.nextElementSibling, image)
+  assert.equal(paragraph.dataset['dcaImageContainer'], '')
+  assert.equal(secondParagraph.dataset['dcaImageContainer'], '')
+  assert.equal(dom!.window.getComputedStyle(secondParagraph).marginTop, '8px')
+
+  marker.open = true
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  const details = marker.querySelector('.dca-image-details') as HTMLElement
+  const caption = marker.querySelector('.dca-image-caption') as HTMLElement
+  assert.equal(dom!.window.getComputedStyle(details).display, 'block')
+  assert.equal(dom!.window.getComputedStyle(details).width, '100%')
+  assert.equal(dom!.window.getComputedStyle(caption).display, 'block')
+  assert.equal(dom!.window.getComputedStyle(caption).textAlign, 'center')
+  assert.equal(dom!.window.getComputedStyle(marker).marginBottom, '8px')
+})
+test('repairs a Windows root-relative Markdown image fallback with the Session cwd', async () => {
+  const flow = render([
+    assistant('answer', [{
+      kind: 'text',
+      text: '![东雪莲 30 万粉纪念新形象](/Code/dsh-plugin2/dongxuelian-30w.png)',
+    }]),
+  ], en, undefined, 'E:\\Code\\dsh-plugin2')
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const fallback = markdownImageFallback()
+  fallback.textContent = '东雪莲 30 万粉纪念新形象'
+  const paragraph = document.createElement('p')
+  paragraph.append(fallback)
+  answer.append(paragraph)
+  await waitForMutationFlush()
+
+  const image = answer.querySelector<HTMLImageElement>('.dca-markdown-image-repair')
+  assert.ok(image)
+  assert.equal(
+    image.getAttribute('src'),
+    'http://127.0.0.1:43120/api/file?path=E%3A%5CCode%5Cdsh-plugin2%5Cdongxuelian-30w.png',
+  )
+  assert.equal(fallback.hidden, true)
+  assert.equal(fallback.dataset['dcaImageRepairFallback'], 'E:\\Code\\dsh-plugin2\\dongxuelian-30w.png')
+  assert.equal(answer.querySelectorAll('details[data-dca-image-group]').length, 1)
+})
+
+test('keeps the image marker when a failed Markdown img becomes the host fallback span', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const image = markdownImage()
+  answer.append(image)
+  await waitForMutationFlush()
+  assert.equal(answer.querySelectorAll('details[data-dca-image-group]').length, 1)
+  assert.equal(image.hidden, true)
+
+  const fallback = markdownImageFallback()
+  const fallbackParagraph = document.createElement('p')
+  fallbackParagraph.append(fallback)
+  image.replaceWith(fallbackParagraph)
+  await waitForMutationFlush()
+
+  const marker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.ok(marker)
+  assert.equal(answer.querySelectorAll('details[data-dca-image-group]').length, 1)
+  assert.equal(fallback.hidden, true)
+  assert.equal(fallback.dataset['dcaImageTarget'], 'answer:image:0')
+
+  marker.open = true
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(fallback.hidden, false)
+})
+
+test('inserts a collapsed marker, preserves mixed output, and expands children', async () => {
   const flow = render([
     assistant('reason', [{ kind: 'reasoning', text: '检查' }]),
     assistant('answer', [
@@ -234,6 +490,21 @@ test('inserts a collapsed marker, preserves mixed output, and expands children',
   assert.equal(answerBody?.classList.contains('dca-activity-inline-body'), true)
   assert.equal(firstMember?.classList.contains('dca-activity-member'), true)
   assert.equal(lastMember?.classList.contains('dca-activity-member'), true)
+  assert.equal(firstMember?.hasAttribute('data-dca-member-collapsed'), true)
+  assert.equal(dom!.window.getComputedStyle(firstMember!).minHeight, 'calc(32px + var(--dsh-content-font-delta, 0px))')
+  assert.equal(dom!.window.getComputedStyle(firstMember!).flexDirection, '')
+  const thinkRow = document.createElement('div')
+  thinkRow.dataset['disclosureRow'] = ''
+  firstMember?.append(thinkRow)
+  await waitForMutationFlush()
+  assert.equal(dom!.window.getComputedStyle(thinkRow).transform, '')
+
+  firstMember?.setAttribute('data-expanded', 'true')
+  await waitForMutationFlush()
+  assert.equal(firstMember?.hasAttribute('data-dca-member-collapsed'), false)
+  firstMember?.removeAttribute('data-expanded')
+  await waitForMutationFlush()
+  assert.equal(firstMember?.hasAttribute('data-dca-member-collapsed'), true)
 })
 
 test('keeps the visible partial output on the same rhythm after hidden rows', () => {
