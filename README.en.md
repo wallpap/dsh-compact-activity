@@ -5,25 +5,20 @@
 
 [简体中文](./README.md) | English
 
-Make DeepSeek Harness thinking and tool calls more compact and easier to browse.
+Make DeepSeek Harness thinking, tool calls, and image output easier to browse.
 
-The plugin groups consecutive thinking and tool calls into a single-line collapsible item. It stays collapsed by default; expand it when you need details. The model's final output always displays normally.
+The plugin puts consecutive thinking and tool calls into one collapsed top-level item. Expanding it still uses DSH's official components, and model output remains visible.
 
-## Why use it
+## Feature overview
 
-- **Less scrolling**: consecutive thinking and tool calls collapse into one item.
-- **Soft panel appearance**: a subtle surface, fine border, and state rail add hierarchy; violet marks running, Miku green marks completion, and red marks execution errors.
-- **Clear expanded ownership**: a neutral process spine connects the summary's flat lower edge to official child rows; consistently rounded child surfaces use pale violet, green, or red for running, completed, or failed states.
-- **Official content unchanged**: expanding still uses DSH's official Think, Code, and tool components.
-- **Model output preserved**: the next model message is never folded into the process list.
-- **Live status**: while running, it shows `In progress...`, counts, and the latest activity summary.
-- **Failure count**: failed process steps have a separate count.
-- **Counts terminal failures**: in addition to regular tool failures, non-zero exit codes and terminating signals from PWSH, Bash, and similar terminal tools count as failed steps.
-- **Terminal state**: when the final process item fails or is interrupted, it shows `Execution error`; when it ends normally, it shows `Done` and later model output does not clear that state.
+- **Process folding**: consecutive or single thinking and tool calls can share one top-level item.
+- **Live state**: shows running, done, or execution error, with counts for thoughts, tools, and failed steps; running tools reuse the official summary.
+- **Failure detection**: counts structured tool errors, interrupted reasoning, and non-zero exit codes or terminating signals from Bash, PWSH, and similar terminal tools.
+- **Output preserved**: when one step contains both thinking and output, only Think is folded.
+- **Image folding**: non-user images are collapsed by default; images in user and steering messages stay unchanged.
+- **Official behavior unchanged**: the plugin does not replace official renderers or modify model context, session logs, or tool execution.
 
-The plugin only adjusts the Web UI presentation. It does not modify model context, session logs, or tool execution.
-
-The top-level disclosure's status and counts follow DSH's language setting, with `中文` and `English` dictionaries. When no explicit preference is stored, DSH derives the initial language from the browser; switching the DSH language updates existing disclosure rows. Official tool titles and summaries remain unchanged.
+Status, counts, and image labels follow DSH's language setting with `中文` and `English` dictionaries. Switching languages updates existing process and image markers.
 
 ## Screenshots
 
@@ -103,22 +98,18 @@ Please install and verify the latest version of dsh-compact-activity.
 
 ## Usage
 
-The plugin has no separate settings page. After installation, restart DSH Web or Desktop and it takes effect automatically; DSH's Language setting controls the copy:
+The plugin has no separate settings page. Restart DSH Web or Desktop after installation; DSH's Language setting controls the copy:
 
 | Scenario | Display behavior |
-| ------------------ | --------------------------------------- |
-| Multiple consecutive process messages | Grouped into one collapsed top-level item |
-| Single process message | Placed in one collapsed top-level process item |
-| Thinking in progress | Shows `In progress...`, counts, and `Thinking` (pale violet) |
-| Calling a tool | Shows the last official tool's type and summary (pale violet) |
-| Work finished | Shows `Done` and counts, with no summary (pale green) |
-| Some tool calls fail but the final tool call succeeds | Shows `Done` and retains the failed-step count |
-| The final process item ends abnormally | Shows `Execution error` with the same icon-count layout (pale red) |
-| Model output follows an execution error | The process group remains `Execution error`; model output stays visible |
-| A tool call in the next turn fails independently | Standalone error row; not attached to the previous process group |
-| Switching the DSH language | Status and counts switch between Chinese and English |
-| Top-level item expanded | Connects the original Think and tool components with a process spine and pale per-item state surfaces |
-| Thinking and a model message in one step | Only the Think is collapsed; the message still displays |
+| -------- | -------- |
+| Consecutive or single process messages | Grouped into one collapsed top-level item |
+| Thinking in progress | Shows `In progress...`, counts, and `Thinking` |
+| Calling a tool | Shows the last official tool's type and summary |
+| Normal completion | Shows `Done` and counts; earlier failures remain in the failure count |
+| The final process item fails or is interrupted | Shows `Execution error`; later model output does not clear it |
+| Thinking and output in one step | Only Think is collapsed; output stays visible |
+| Top-level item expanded | Continues to use official Think and tool components, with member states |
+| Switching the DSH language | Process and image markers switch between Chinese and English |
 
 Overly long live summaries are truncated automatically and never squeeze the layout.
 
@@ -223,11 +214,11 @@ src/
 
 Compatibility status:
 
-As of September 18, 2026, the results below are based on the local source checkouts and Desktop's vendored runtime archives; a real Electron/Desktop window has not yet been launched for manual regression.
+As of September 19, 2026, the results below are based on the local source checkouts and Desktop's vendored runtime archives; a real Electron/Desktop window has not yet been launched for manual regression.
 
 | Environment | Version | Result |
 | ----------- | ------- | ------ |
-| DeepSeek Harness official Web | `0.1.6-alpha.2` (commit `ddefc45f`) | The plugin dev dependencies link directly to the latest local source; `npm run typecheck` and `npm run build` pass, and the grouping/controller tests pass. In the full `npm test`, the performance benchmark can fall below its 200/300 tops threshold under the current machine load; the performance test passes when run in isolation. |
+| DeepSeek Harness official Web | `0.1.6-alpha.2` (commit `ddefc45f`) | Dev dependencies link to the local source; `npm run typecheck`, `npm test`, and `npm run build` pass. A real Web window has not been manually regressed. |
 | Community DSH Desktop stable | `2.0.12`, bundled DSH `0.1.5-rc.2` | The `vendor/dsh-runtime/0.1.5-rc.2` Client bundle still contains the Chat Flow, Think, Tool, and Turn-process markers; no source-contract conflict was found, but real Desktop startup and profile composition were not run. |
 | Community DSH Desktop Beta | `2.0.12-beta.1`, bundled DSH `0.1.6-alpha.2` | Uses the same Client contract as the current official Web source; the Beta runtime version matches the local source checkout. Real Desktop startup and profile composition were not run. |
 
@@ -251,10 +242,9 @@ Non-user-input images are collapsed by default, including:
 - image galleries returned by tools;
 - image displays in other Chat Flow rows that are not `user` or `steering` messages.
 
-Images in user and steering messages remain unchanged. The plugin uses independent markers: `data-dca-image-group`, `data-dca-image-target`, and `data-dca-image-hidden`. The controller inserts only native `<details>/<summary>` markers and hides the original image target; it does not move or replace DSH's image DOM subtree, so the host continues to own image loading, retry, and lightbox behavior.
+Images in user and steering messages remain unchanged. The plugin uses independent markers: `data-dca-image-group`, `data-dca-image-target`, and `data-dca-image-hidden`. It inserts only native `<details>/<summary>` markers and hides the original image target; it does not move or replace DSH's image DOM subtree.
 
-Image detection reuses the current DSH renderer's image buttons, Markdown-image attributes, and the fallback node used for failed images. Its CSS-module class name is not treated as a stable contract; the plugin also recognizes the renderer's semantic fallback shape. After upgrading DSH, manually check Assistant images, tool images, multi-image galleries, failed-image fallback text, user-input images, and lightbox expansion.
-On Windows Desktop, when DSH falls back to italic text for a local Markdown path under the Session workspace (for example `/Code/...`), the plugin uses the current Session working directory to restore the drive-qualified path and remounts the image through the authenticated `/api/file` route. If the working directory cannot be resolved or the file is actually missing, DSH's fallback text is retained. Image markers reuse the process-row status colors and SVG chevron; one marker is created per Markdown image reference, and expanded markers show a bold italic “image name (path)” caption.
+Image folding uses short enter/leave transitions and honors `prefers-reduced-motion`. Detection reuses DSH's image buttons, Markdown-image attributes, and semantic failed-image fallback shape. One marker is created per Markdown image reference, with the image name and path shown when expanded. On Windows Desktop, local Markdown paths are resolved against the current Session working directory and remounted through the authenticated `/api/file` route; unresolved or missing files keep DSH's fallback text. After upgrading DSH, manually check Assistant images, tool images, multi-image galleries, failed-image fallback text, user-input images, and lightbox expansion.
 
 ### DSH Desktop service boundary
 

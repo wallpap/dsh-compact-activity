@@ -304,6 +304,38 @@ test('folds non-user image displays while preserving user input images', async (
   assert.equal(assistantGallery.hidden, false)
 })
 
+test('refreshes image labels after a loading placeholder becomes an image', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const gallery = document.createElement('div')
+  gallery.dataset['align'] = 'start'
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.dataset['variant'] = 'single'
+  const loading = document.createElement('span')
+  loading.textContent = '图片加载中...'
+  button.append(loading)
+  gallery.append(button)
+  answer.append(gallery)
+  await waitForMutationFlush()
+
+  const marker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.ok(marker)
+  assert.equal(marker.querySelector('.dca-image-label')?.textContent, '图片加载中...')
+
+  const image = markdownImage()
+  image.alt = 'Cure Arcana'
+  button.replaceChildren(image)
+  await waitForMutationFlush()
+
+  assert.equal(marker.querySelector('.dca-image-label')?.textContent, 'Cure Arcana')
+  assert.equal(imageCaptionForMarker(marker)?.querySelector('.dca-image-caption')?.textContent, 'Cure Arcana')
+})
+
 test('folds Markdown image fallback text when the host renders no img element', async () => {
   const flow = render([
     assistant('answer', [{ kind: 'text', text: '正文' }]),

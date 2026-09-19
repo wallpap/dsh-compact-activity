@@ -1355,6 +1355,7 @@ function containsImageDisplay(node: Node): boolean {
   if (!isElement(node)) return false
   return node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)
     || node.matches(IMAGE_BUTTON_SELECTOR)
+    || node.closest(IMAGE_BUTTON_SELECTOR) !== null
     || node.matches(MARKDOWN_IMAGE_SELECTOR)
     || isMarkdownImageFallback(node)
     || node.querySelector(IMAGE_BUTTON_SELECTOR) !== null
@@ -1369,6 +1370,9 @@ function affectsImages(records: readonly MutationRecord[]): boolean {
       // 标记自身拥有 summary 和标题子树。这些子树的内部更新不属于图片显示
       // 变化；只有标记本身的挂载或移除才需要重新扫描图片。
       if (isElement(record.target) && record.target.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)) return false
+      // MessageImage 会在同一个官方按钮内将“图片加载中...”替换为 <img>。
+      // 这类变化不会出现在新增节点的稳定图片选择器上，需要直接检查祖先按钮。
+      if (isElement(record.target) && record.target.closest(IMAGE_BUTTON_SELECTOR) !== null) return true
       return [...record.addedNodes, ...record.removedNodes].some(containsImageDisplay)
     }
     return record.type === 'attributes'

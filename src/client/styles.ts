@@ -194,6 +194,11 @@ export const STYLE_TEXT = String.raw`
   line-height: 20px;
 }
 
+/* 折叠过程成员中的官方图片画廊默认靠左，改为在成员内容区水平居中。 */
+.dca-activity-member [data-dca-image-target][data-align] {
+  justify-content: center !important;
+}
+
 .dca-activity-group {
   --dca-state-accent: #39c5bb;
   --dca-error-accent: color-mix(
