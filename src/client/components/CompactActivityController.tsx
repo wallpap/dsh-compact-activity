@@ -27,6 +27,7 @@ const IMAGE_MARKER_ATTRIBUTE = 'data-dca-image-group'
 const IMAGE_TARGET_ATTRIBUTE = 'data-dca-image-target'
 const IMAGE_CONTAINER_ATTRIBUTE = 'data-dca-image-container'
 const IMAGE_CONTAINER_DATASET = 'dcaImageContainer'
+const IMAGE_CAPTION_CLASS = 'dca-image-details'
 const IMAGE_HIDDEN_DATASET = 'dcaImageHidden'
 const IMAGE_MARKER_SIGNATURE_DATASET = 'dcaImageSignature'
 const IMAGE_MARKER_LABELS_DATASET = 'dcaImageLabels'
@@ -37,6 +38,12 @@ const IMAGE_REPAIR_FALLBACK_DATASET = 'dcaImageRepairFallback'
 const IMAGE_REPAIR_FAILED_DATASET = 'dcaImageRepairFailed'
 const IMAGE_REPAIR_SOURCE_DATASET = 'dcaImageRepairSource'
 const IMAGE_REPAIR_ORIGINAL_SOURCE_DATASET = 'dcaImageRepairOriginalSource'
+const IMAGE_TRANSITION_ATTRIBUTE = 'data-dca-image-transition'
+const IMAGE_TRANSITION_DATASET = 'dcaImageTransition'
+const IMAGE_TRANSITION_ACTIVE = 'active'
+const IMAGE_CAPTION_TRANSITION_DATASET = 'dcaImageCaptionTransition'
+const IMAGE_CAPTION_HIDDEN_DATASET = 'dcaImageCaptionHidden'
+const IMAGE_TRANSITION_DURATION_MS = 160
 const IMAGE_BUTTON_SELECTOR = [
   'button[data-variant="single"]',
   'button[data-variant="tile"]',
@@ -49,6 +56,20 @@ const MARKDOWN_IMAGE_SELECTOR = 'img[loading="lazy"][decoding="async"][referrerp
 // fast path; isMarkdownImageFallback also recognizes the semantic <p><span>
 // fallback shape used by the renderer.
 const MARKDOWN_IMAGE_ALT_SELECTOR = 'span[class*="imageAlt"]'
+type ImageTransitionKind = 'enter' | 'leave'
+
+interface ImageTransitionState {
+  readonly kind: ImageTransitionKind
+  readonly token: number
+  frame?: number
+  timer?: ReturnType<typeof setTimeout>
+}
+
+const imageTransitions = new WeakMap<HTMLElement, ImageTransitionState>()
+const imageCaptionTransitions = new WeakMap<HTMLElement, ImageTransitionState>()
+const imageCaptions = new WeakMap<HTMLDetailsElement, HTMLElement>()
+let nextImageTransitionToken = 0
+
 const IMAGE_RELEVANT_ATTRIBUTES = new Set([
   'data-align',
   'data-chat-flow-kind',
@@ -152,13 +173,14 @@ function imageMarkersIn(container: HTMLElement): Map<string, HTMLDetailsElement>
   const markers = new Map<string, HTMLDetailsElement>()
   for (const marker of container.querySelectorAll<HTMLDetailsElement>(`details[${IMAGE_MARKER_ATTRIBUTE}]`)) {
     const id = marker.dataset['dcaImageGroup'] ?? ''
-    if (markers.has(id)) marker.remove()
-    else markers.set(id, marker)
+    if (markers.has(id)) {
+      removeImageMarker(marker)
+    } else markers.set(id, marker)
   }
   return markers
 }
 
-function setImageHidden(element: HTMLElement, hidden: boolean): void {
+function setImageHiddenState(element: HTMLElement, hidden: boolean): void {
   if (hidden) {
     element.dataset[IMAGE_HIDDEN_DATASET] = ''
     if (!element.hasAttribute('hidden')) element.setAttribute('hidden', '')
@@ -169,10 +191,157 @@ function setImageHidden(element: HTMLElement, hidden: boolean): void {
   if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
 }
 
+function cancelImageTransition(element: HTMLElement): void {
+  const state = imageTransitions.get(element)
+  if (state === undefined) {
+    delete element.dataset[IMAGE_TRANSITION_DATASET]
+    return
+  }
+  if (state.frame !== undefined && typeof globalThis.cancelAnimationFrame === 'function') {
+    globalThis.cancelAnimationFrame(state.frame)
+  }
+  if (state.timer !== undefined) clearTimeout(state.timer)
+  imageTransitions.delete(element)
+  delete element.dataset[IMAGE_TRANSITION_DATASET]
+}
+
+function setImageHidden(element: HTMLElement, hidden: boolean): void {
+  cancelImageTransition(element)
+  setImageHiddenState(element, hidden)
+}
+
+function prefersReducedMotion(): boolean {
+  return globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
+function finishImageTransition(element: HTMLElement, state: ImageTransitionState): void {
+  if (imageTransitions.get(element)?.token !== state.token) return
+  imageTransitions.delete(element)
+  delete element.dataset[IMAGE_TRANSITION_DATASET]
+  if (state.kind === 'leave') setImageHiddenState(element, true)
+}
+
+function transitionImageVisibility(element: HTMLElement, visible: boolean): void {
+  const current = imageTransitions.get(element)
+  const targetKind: ImageTransitionKind = visible ? 'enter' : 'leave'
+  const pluginHidden = element.dataset[IMAGE_HIDDEN_DATASET] !== undefined
+  if (current?.kind === targetKind) return
+  if (current === undefined && (visible ? !pluginHidden : pluginHidden)) return
+
+  if (prefersReducedMotion()) {
+    cancelImageTransition(element)
+    setImageHiddenState(element, !visible)
+    return
+  }
+
+  cancelImageTransition(element)
+  const state: ImageTransitionState = { kind: targetKind, token: ++nextImageTransitionToken }
+  imageTransitions.set(element, state)
+  element.dataset[IMAGE_TRANSITION_DATASET] = targetKind
+
+  const startVisiblePhase = (): void => {
+    if (imageTransitions.get(element)?.token !== state.token) return
+    element.dataset[IMAGE_TRANSITION_DATASET] = IMAGE_TRANSITION_ACTIVE
+    state.timer = setTimeout(() => finishImageTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
+  }
+
+  if (visible) {
+    setImageHiddenState(element, false)
+    if (typeof globalThis.requestAnimationFrame === 'function') state.frame = globalThis.requestAnimationFrame(startVisiblePhase)
+    else queueMicrotask(startVisiblePhase)
+    return
+  }
+
+  state.timer = setTimeout(() => finishImageTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
+}
+
+function setImageCaptionHiddenState(element: HTMLElement, hidden: boolean): void {
+  if (hidden) element.dataset[IMAGE_CAPTION_HIDDEN_DATASET] = ''
+  else delete element.dataset[IMAGE_CAPTION_HIDDEN_DATASET]
+}
+
+function cancelImageCaptionTransition(element: HTMLElement): void {
+  const state = imageCaptionTransitions.get(element)
+  if (state === undefined) {
+    delete element.dataset[IMAGE_CAPTION_TRANSITION_DATASET]
+    return
+  }
+  if (state.frame !== undefined && typeof globalThis.cancelAnimationFrame === 'function') {
+    globalThis.cancelAnimationFrame(state.frame)
+  }
+  if (state.timer !== undefined) clearTimeout(state.timer)
+  imageCaptionTransitions.delete(element)
+  delete element.dataset[IMAGE_CAPTION_TRANSITION_DATASET]
+}
+
+function finishImageCaptionTransition(element: HTMLElement, state: ImageTransitionState): void {
+  if (imageCaptionTransitions.get(element)?.token !== state.token) return
+  imageCaptionTransitions.delete(element)
+  delete element.dataset[IMAGE_CAPTION_TRANSITION_DATASET]
+  if (state.kind === 'leave') setImageCaptionHiddenState(element, true)
+}
+
+function transitionImageCaption(element: HTMLElement, open: boolean): void {
+  const current = imageCaptionTransitions.get(element)
+  const targetKind: ImageTransitionKind = open ? 'enter' : 'leave'
+  const captionHidden = element.dataset[IMAGE_CAPTION_HIDDEN_DATASET] !== undefined
+  if (current?.kind === targetKind) return
+  if (current === undefined && (open ? !captionHidden : captionHidden)) return
+
+  if (prefersReducedMotion()) {
+    cancelImageCaptionTransition(element)
+    setImageCaptionHiddenState(element, !open)
+    return
+  }
+
+  cancelImageCaptionTransition(element)
+  const state: ImageTransitionState = { kind: targetKind, token: ++nextImageTransitionToken }
+  imageCaptionTransitions.set(element, state)
+  element.dataset[IMAGE_CAPTION_TRANSITION_DATASET] = targetKind
+
+  const startVisiblePhase = (): void => {
+    if (imageCaptionTransitions.get(element)?.token !== state.token) return
+    element.dataset[IMAGE_CAPTION_TRANSITION_DATASET] = IMAGE_TRANSITION_ACTIVE
+    state.timer = setTimeout(() => finishImageCaptionTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
+  }
+
+  if (open) {
+    setImageCaptionHiddenState(element, false)
+    if (typeof globalThis.requestAnimationFrame === 'function') state.frame = globalThis.requestAnimationFrame(startVisiblePhase)
+    else queueMicrotask(startVisiblePhase)
+    return
+  }
+
+  state.timer = setTimeout(() => finishImageCaptionTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
+}
+
+function syncImageCaptionVisibility(element: HTMLElement, hidden: boolean): void {
+  const transition = imageCaptionTransitions.get(element)
+  const expectedKind: ImageTransitionKind = hidden ? 'leave' : 'enter'
+  if (transition?.kind === expectedKind) return
+  if (transition !== undefined) {
+    transitionImageCaption(element, !hidden)
+    return
+  }
+  const captionHidden = element.dataset[IMAGE_CAPTION_HIDDEN_DATASET] !== undefined
+  if (captionHidden !== hidden) setImageCaptionHiddenState(element, hidden)
+}
+
+function removeImageMarker(marker: HTMLDetailsElement): void {
+  const caption = imageCaptions.get(marker)
+  if (caption !== undefined) {
+    cancelImageCaptionTransition(caption)
+    caption.remove()
+    imageCaptions.delete(marker)
+  }
+  marker.remove()
+}
+
 function isImageContainerChild(node: Node): boolean {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent?.trim() === ''
   if (!(node instanceof HTMLElement)) return false
-  if (hasMarkdownImageFallback(node)) return true
+  if (isMarkdownImageFallback(node)) return true
+  if (node.matches(`.${IMAGE_CAPTION_CLASS}`)) return true
   return node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)
     || node.matches(MARKDOWN_IMAGE_SELECTOR)
     || node.matches(`[${IMAGE_REPAIR_FALLBACK_ATTRIBUTE}]`)
@@ -188,11 +357,7 @@ function imageContainerFor(element: HTMLElement): HTMLElement | undefined {
   return children.length > 0 && children.every(isImageContainerChild) ? parent : undefined
 }
 
-function hasMarkdownImageFallback(element: Element): boolean {
-  return isMarkdownImageFallback(element)
-}
-
-function isMarkdownImageFallback(element: Element): element is HTMLElement {
+function isMarkdownImageFallback(element: Element): boolean {
   if (element.matches(MARKDOWN_IMAGE_ALT_SELECTOR)) return true
   if (!(element instanceof HTMLElement) || element.localName !== 'span') return false
   const paragraph = element.parentElement
@@ -201,7 +366,7 @@ function isMarkdownImageFallback(element: Element): element is HTMLElement {
   // fallback structural check narrow so ordinary inline spans are not folded.
   return [...paragraph.childNodes].every(node => node === element
     || node.nodeType === Node.TEXT_NODE && node.textContent?.trim() === ''
-    || node instanceof HTMLElement && node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`))
+    || node instanceof HTMLElement && node.matches(`[${IMAGE_MARKER_ATTRIBUTE}], .${IMAGE_CAPTION_CLASS}`))
 }
 
 function markdownImageReferencesIn(
@@ -559,12 +724,19 @@ function setImageMarkerText(
   marker: HTMLDetailsElement,
   target: ImageTarget,
   t: ActivityTranslate,
-): void {
+): HTMLElement {
   const label = imageSummaryLabel(target, t)
   const labels = target.labels.length > 0 ? target.labels : [{ name: label, path: undefined }]
   const captionText = labels.map(item => imageCaption(item, label)).join(' / ')
   const signature = JSON.stringify([label, captionText, target.inline, labels])
-  if (marker.dataset[IMAGE_MARKER_SIGNATURE_DATASET] === signature) return
+  let details = imageCaptions.get(marker)
+  if (details === undefined) {
+    details = document.createElement('div')
+    details.className = IMAGE_CAPTION_CLASS
+    setImageCaptionHiddenState(details, true)
+    imageCaptions.set(marker, details)
+  }
+  if (marker.dataset[IMAGE_MARKER_SIGNATURE_DATASET] === signature) return details
   marker.dataset[IMAGE_MARKER_SIGNATURE_DATASET] = signature
   marker.dataset[IMAGE_MARKER_LABELS_DATASET] = JSON.stringify(labels)
   marker.dataset['dcaImageCount'] = String(target.count)
@@ -587,15 +759,13 @@ function setImageMarkerText(
   summary.append(stateRail, arrow, text)
   marker.append(summary)
 
-  const details = document.createElement('div')
-  details.className = 'dca-image-details'
-  for (const item of labels) {
+  details.replaceChildren(...labels.map(item => {
     const caption = document.createElement('div')
     caption.className = 'dca-image-caption'
     caption.textContent = imageCaption(item, label)
-    details.append(caption)
-  }
-  marker.append(details)
+    return caption
+  }))
+  return details
 }
 
 function syncImageLabelsIn(container: HTMLElement, t: ActivityTranslate): void {
@@ -614,6 +784,24 @@ function syncImageLabelsIn(container: HTMLElement, t: ActivityTranslate): void {
 
 function setImageTargetHidden(target: ImageTarget, hidden: boolean): void {
   for (const element of target.elements) setImageHidden(element, hidden)
+}
+
+function transitionImageTarget(target: ImageTarget, open: boolean): void {
+  for (const element of target.elements) transitionImageVisibility(element, open)
+}
+
+function syncImageTargetVisibility(target: ImageTarget, hidden: boolean): void {
+  for (const element of target.elements) {
+    const transition = imageTransitions.get(element)
+    const expectedKind: ImageTransitionKind = hidden ? 'leave' : 'enter'
+    if (transition?.kind === expectedKind) continue
+    if (transition !== undefined) {
+      transitionImageVisibility(element, !hidden)
+      continue
+    }
+    const currentlyHidden = element.dataset[IMAGE_HIDDEN_DATASET] !== undefined
+    if (currentlyHidden !== hidden) setImageHidden(element, hidden)
+  }
 }
 
 /**
@@ -657,13 +845,14 @@ function syncImageGroups(
     }
   }
   for (const [id, marker] of markers) {
-    if (!activeIds.has(id)) marker.remove()
+    if (!activeIds.has(id)) removeImageMarker(marker)
   }
 
   for (const candidate of candidates) {
     const { id, target } = candidate
     for (const element of target.elements) element.dataset['dcaImageTarget'] = id
     let marker = markers.get(id)
+    const markerCreated = marker === undefined
     if (marker === undefined) {
       marker = document.createElement('details')
       marker.className = 'dca-image-group'
@@ -671,12 +860,21 @@ function syncImageGroups(
       markers.set(id, marker)
     }
     const currentMarker = marker
+    const details = setImageMarkerText(currentMarker, target, t)
+    const lastTarget = target.elements.at(-1) ?? target.element
     currentMarker.ontoggle = () => {
-      setImageTargetHidden(target, !currentMarker.open)
+      transitionImageCaption(details, currentMarker.open)
+      transitionImageTarget(target, currentMarker.open)
     }
-    setImageMarkerText(currentMarker, target, t)
     if (currentMarker.nextElementSibling !== target.element) target.element.before(currentMarker)
-    setImageTargetHidden(target, !currentMarker.open)
+    if (lastTarget.nextElementSibling !== details) lastTarget.after(details)
+    if (markerCreated) {
+      setImageTargetHidden(target, !currentMarker.open)
+      setImageCaptionHiddenState(details, true)
+    } else {
+      syncImageTargetVisibility(target, !currentMarker.open)
+      syncImageCaptionVisibility(details, !currentMarker.open)
+    }
   }
 }
 
@@ -999,7 +1197,6 @@ function syncContainer(
   sessionCwd: string | undefined,
 ): void {
   const rows = rowsIn(container)
-  const imageReferences = markdownImageReferencesIn(rows, chat)
   const orderedRows = [...rows.values()]
   const visibleGroups = groups.filter(group => group.keys.every(key => rows.has(key)))
   const activeKeys = new Set(visibleGroups.flatMap(group => group.keys))
@@ -1053,6 +1250,7 @@ function syncContainer(
   }
   syncOfficialHiddenRows(rows)
   if (syncImages) {
+    const imageReferences = markdownImageReferencesIn(rows, chat)
     repairMarkdownImages(rows, imageReferences, sessionCwd)
     syncImageGroups(container, rows, t, imageReferences, sessionCwd)
   } else if (syncImageLabels) syncImageLabelsIn(container, t)
@@ -1144,6 +1342,13 @@ function cleanup(): void {
   for (const element of document.querySelectorAll<HTMLElement>(`[${IMAGE_CONTAINER_ATTRIBUTE}]`)) {
     delete element.dataset[IMAGE_CONTAINER_DATASET]
   }
+  for (const element of document.querySelectorAll<HTMLElement>(`[${IMAGE_TRANSITION_ATTRIBUTE}]`)) {
+    cancelImageTransition(element)
+  }
+  for (const details of document.querySelectorAll<HTMLElement>('.dca-image-details')) {
+    cancelImageCaptionTransition(details)
+    details.remove()
+  }
   for (const target of document.querySelectorAll<HTMLElement>(`[${IMAGE_TARGET_ATTRIBUTE}]`)) {
     setImageHidden(target, false)
     delete target.dataset['dcaImageTarget']
@@ -1165,7 +1370,7 @@ function cleanup(): void {
     delete fallback.dataset[IMAGE_REPAIR_FAILED_DATASET]
   }
   for (const marker of document.querySelectorAll<HTMLElement>(`[${MARKER_ATTRIBUTE}]`)) marker.remove()
-  for (const marker of document.querySelectorAll<HTMLElement>(`[${IMAGE_MARKER_ATTRIBUTE}]`)) marker.remove()
+  for (const marker of document.querySelectorAll<HTMLDetailsElement>(`[${IMAGE_MARKER_ATTRIBUTE}]`)) removeImageMarker(marker)
 }
 
 /**

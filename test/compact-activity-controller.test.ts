@@ -133,6 +133,15 @@ function markdownImageFallback(): HTMLSpanElement {
   return fallback
 }
 
+function imageCaptionForMarker(marker: HTMLDetailsElement): HTMLElement | null {
+  let sibling = marker.nextElementSibling
+  while (sibling !== null) {
+    if (sibling instanceof HTMLElement && sibling.classList.contains('dca-image-details')) return sibling
+    sibling = sibling.nextElementSibling
+  }
+  return null
+}
+
 function waitForMutationFlush(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0))
 }
@@ -301,7 +310,7 @@ test('folds Markdown image fallback text when the host renders no img element', 
   const marker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
   assert.ok(marker)
   assert.equal(marker.querySelector('.dca-image-label')?.textContent, 'markdown image fallback')
-  assert.equal(marker.querySelector('.dca-image-caption')?.textContent, 'markdown image fallback')
+  assert.equal(imageCaptionForMarker(marker)?.querySelector('.dca-image-caption')?.textContent, 'markdown image fallback')
   assert.equal(fallback.hidden, true)
   assert.equal(fallback.dataset['dcaImageTarget'], 'answer:image:0')
 
@@ -339,7 +348,7 @@ test('deduplicates repeated Markdown image displays and labels each image', asyn
   assert.deepEqual(markers.map(marker => marker.querySelector('.dca-image-label')?.textContent), [firstAlt, secondAlt])
   assert.equal(markers.every(marker => marker.querySelector('svg.dca-image-marker-icon') !== null), true)
   assert.deepEqual(
-    markers.map(marker => marker.querySelector('.dca-image-caption')?.textContent),
+    markers.map(marker => imageCaptionForMarker(marker)?.querySelector('.dca-image-caption')?.textContent),
     [`${firstAlt}（${firstSource}）`, `${secondAlt}（${secondSource}）`],
   )
   assert.equal([...answer.querySelectorAll<HTMLImageElement>('img')].every(image => image.hidden), true)
@@ -388,14 +397,70 @@ test('keeps Markdown image disclosures vertical, 8px apart, and edge-aligned', a
 
   marker.open = true
   marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
-  const details = marker.querySelector('.dca-image-details') as HTMLElement
-  const caption = marker.querySelector('.dca-image-caption') as HTMLElement
+  const details = imageCaptionForMarker(marker)
+  assert.ok(details)
+  assert.equal(image.nextElementSibling, details)
+  const caption = details.querySelector('.dca-image-caption') as HTMLElement
   assert.equal(dom!.window.getComputedStyle(details).display, 'block')
   assert.equal(dom!.window.getComputedStyle(details).width, '100%')
   assert.equal(dom!.window.getComputedStyle(caption).display, 'block')
   assert.equal(dom!.window.getComputedStyle(caption).textAlign, 'center')
   assert.equal(dom!.window.getComputedStyle(marker).marginBottom, '8px')
 })
+test('animates image visibility and cancels stale transitions', async () => {
+  const flow = render([
+    assistant('answer', [{ kind: 'text', text: '正文' }]),
+  ])
+  const answer = flow.querySelector<HTMLElement>('[data-chat-flow-key="answer"]')
+  assert.ok(answer)
+
+  const image = markdownImage()
+  answer.append(image)
+  await waitForMutationFlush()
+
+  const marker = answer.querySelector<HTMLDetailsElement>('details[data-dca-image-group]')
+  assert.ok(marker)
+  const caption = imageCaptionForMarker(marker)
+  assert.ok(caption)
+  assert.equal(image.hidden, true)
+
+  marker.open = true
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(image.hidden, false)
+  assert.equal(image.dataset['dcaImageTransition'], 'enter')
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], 'enter')
+  await waitForMutationFlush()
+  assert.equal(image.dataset['dcaImageTransition'], 'active')
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], 'active')
+
+  marker.open = false
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(image.hidden, false)
+  assert.equal(image.dataset['dcaImageTransition'], 'leave')
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], 'leave')
+  assert.equal(dom!.window.getComputedStyle(caption).display, 'block')
+
+  marker.open = true
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(image.dataset['dcaImageTransition'], 'enter')
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], 'enter')
+  await waitForMutationFlush()
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.equal(image.hidden, false)
+  assert.equal(image.dataset['dcaImageTransition'], undefined)
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], undefined)
+
+  Object.defineProperty(dom!.window, 'matchMedia', {
+    configurable: true,
+    value: () => ({ matches: true }),
+  })
+  marker.open = false
+  marker.ontoggle?.(new dom!.window.Event('toggle') as unknown as ToggleEvent)
+  assert.equal(image.hidden, true)
+  assert.equal(image.dataset['dcaImageTransition'], undefined)
+  assert.equal(caption.dataset['dcaImageCaptionTransition'], undefined)
+})
+
 test('repairs a Windows root-relative Markdown image fallback with the Session cwd', async () => {
   const flow = render([
     assistant('answer', [{

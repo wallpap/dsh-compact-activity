@@ -19,8 +19,39 @@ export const STYLE_TEXT = String.raw`
 
 /* Image folding owns only this marker/target pair. The host image subtree is
    kept in place so its loader and lightbox remain under DSH's control. */
-[data-dca-image-hidden] {
+[data-dca-image-hidden],
+[data-dca-image-caption-hidden] {
   display: none !important;
+}
+
+/* Image targets stay in the host DOM. During a user-triggered toggle, the
+   controller delays hidden=display:none until the leave transition finishes. */
+[data-dca-image-transition] {
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-dca-image-transition='enter'],
+[data-dca-image-transition='leave'] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+}
+
+/* Captions are plugin-owned siblings placed after the host image target, so
+   they leave the layout in the same phase as the image instead of first. */
+[data-dca-image-caption-transition] {
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-dca-image-caption-transition='enter'],
+[data-dca-image-caption-transition='leave'] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
 }
 
 .dca-markdown-image-repair {
@@ -72,7 +103,7 @@ export const STYLE_TEXT = String.raw`
   width: 100%;
 }
 
-[data-dca-image-container] > .dca-image-group-inline[open] > .dca-image-details {
+[data-dca-image-container] > .dca-image-details {
   box-sizing: border-box;
   width: 100%;
   margin-left: 0;
@@ -463,8 +494,18 @@ export const STYLE_TEXT = String.raw`
   .dca-activity-member,
   .dca-marker,
   .dca-image-summary,
-  .dca-image-marker-icon {
+  .dca-image-marker-icon,
+  [data-dca-image-transition],
+  [data-dca-image-caption-transition] {
     transition: none;
+  }
+
+  [data-dca-image-transition='enter'],
+  [data-dca-image-transition='leave'],
+  [data-dca-image-caption-transition='enter'],
+  [data-dca-image-caption-transition='leave'] {
+    opacity: 1;
+    transform: none;
   }
 }
 `
