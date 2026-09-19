@@ -12,6 +12,7 @@ import { STYLE_TEXT } from '../src/client/styles.ts'
 let dom: JSDOM | undefined
 let root: Root | undefined
 
+/** 创建 jsdom 页面并安装控制器依赖的浏览器全局对象。 */
 function installDom(): HTMLElement {
   // jsdom 不会自动暴露控制器依赖的浏览器全局对象，测试仅安装这几个 API。
   dom = new JSDOM('<!doctype html><body><div id="root"></div></body>', { url: 'http://127.0.0.1:43120/' })
@@ -37,6 +38,7 @@ afterEach(() => {
   dom = undefined
 })
 
+/** 构造用于 DOM 控制器夹具的 assistant-step 节点。 */
 function assistant(
   key: string,
   blocks: readonly AssistantBlock[],
@@ -54,6 +56,7 @@ function assistant(
   }
 }
 
+/** 构造最小工具结果，便于切换完成和失败状态。 */
 function toolResult(callId: string, isError = false): ToolResultNode {
   return {
     kind: 'tool-result',
@@ -68,6 +71,7 @@ function toolResult(callId: string, isError = false): ToolResultNode {
   }
 }
 
+/** 构造运行中或已结束的工具调用节点。 */
 function tool(key: string, running = false, isError = false): ChatNode<'tool-call'> {
   return {
     key,
@@ -93,11 +97,13 @@ function tool(key: string, running = false, isError = false): ChatNode<'tool-cal
   }
 }
 
+/** 将测试节点包装为控制器需要的最小 ChatNodeStore。 */
 function store(nodes: readonly ChatNode[]): ChatNodeStore {
   const byKey = new Map(nodes.map(node => [node.key, node]))
   return { get: key => byKey.get(key), values: () => [...nodes] }
 }
 
+/** 构造 DSH 官方图片画廊的稳定 DOM 夹具。 */
 function imageGallery(count = 1): HTMLDivElement {
   const gallery = document.createElement('div')
   gallery.dataset['align'] = 'start'
@@ -113,6 +119,7 @@ function imageGallery(count = 1): HTMLDivElement {
   return gallery
 }
 
+/** 构造符合 DSH Markdown 图片选择器的 img 元素。 */
 function markdownImage(): HTMLImageElement {
   const image = document.createElement('img')
   image.setAttribute('loading', 'lazy')
@@ -122,17 +129,18 @@ function markdownImage(): HTMLImageElement {
   return image
 }
 
+/** 构造 DSH 失败 Markdown 图片的语义回退节点。 */
 function markdownImageFallback(): HTMLSpanElement {
   const fallback = document.createElement('span')
-  // dsh-client-ui-primitives renders failed or rejected Markdown images as
-  // a CSS-module span instead of leaving an <img> in the DOM. The production
-  // hash differs between DSH bundles, so this fixture intentionally does not
-  // rely on the source class name.
+  // dsh-client-ui-primitives 会将失败或被拒绝的 Markdown 图片渲染为
+  // CSS Module span，而不是在 DOM 中保留 <img>。不同 DSH 构建版本的类名
+  // 哈希可能不同，因此该夹具不会依赖源码中的类名。
   fallback.className = '_fallback_404681'
   fallback.textContent = 'markdown image fallback'
   return fallback
 }
 
+/** 在图片标记后查找插件生成的标题节点。 */
 function imageCaptionForMarker(marker: HTMLDetailsElement): HTMLElement | null {
   let sibling = marker.nextElementSibling
   while (sibling !== null) {
@@ -142,10 +150,12 @@ function imageCaptionForMarker(marker: HTMLDetailsElement): HTMLElement | null {
   return null
 }
 
+/** 等待 MutationObserver 和 React DOM 更新完成一轮异步刷新。 */
 function waitForMutationFlush(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0))
 }
 
+/** 将聊天节点和稳定宿主 DOM 标记渲染为控制器测试夹具。 */
 function render(nodes: readonly ChatNode[], dictionary: typeof en = en, officialOpen?: boolean, cwd?: string): HTMLElement {
   const container = installDom()
   const flow = document.createElement('div')

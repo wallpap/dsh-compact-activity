@@ -8,8 +8,10 @@ import { ACTIVITY_NS, en, zh } from './locales.ts'
 import { STYLE_ID, STYLE_TEXT } from './styles.ts'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
+/** 声明 Client 入口需要使用的 DSH 服务。 */
 export const inject = ['slots', 'locale']
 
+/** 注册本插件的文案、样式和会话过程控制器。 */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(ACTIVITY_NS, { zh, en }), 'dsh-compact-activity: locale')
   ctx.effect(() => {

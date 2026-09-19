@@ -1,11 +1,16 @@
 import type { AssistantBlock, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 
+/** 总折叠成员在官方过程项中的展示状态。 */
 export type ActivityMemberState = 'running' | 'done' | 'error'
 
+/** 总折叠中一个可见的顶层过程成员。 */
 export interface ActivityMember {
+  /** 所属官方过程行的稳定键。 */
   readonly rowKey: string
+  /** 成员是模型思考还是顶层工具调用。 */
   readonly kind: 'reasoning' | 'tool'
+  /** 成员当前的运行、完成或失败状态。 */
   readonly state: ActivityMemberState
 }
 
@@ -19,18 +24,23 @@ export interface ActivityGroup {
   readonly partialKey?: string
   /** 最新过程项所在行；进行中时从该行复用官方摘要。 */
   readonly latestKey: string
+  /** 最新过程项的类型。 */
   readonly latestKind: 'reasoning' | 'tool'
+  /** 组内非空思考块的数量。 */
   readonly reasoningCount: number
+  /** 组内根工具调用及嵌套工具调用的总数量。 */
   readonly toolCount: number
   /** 过程内失败或中断的思考／工具步骤数。 */
   readonly failureCount: number
   /** 展开后可见的顶层官方过程项及各自状态；嵌套工具继续使用 DSH 官方层级。 */
   readonly members: readonly ActivityMember[]
+  /** 组内是否存在仍在运行的过程项。 */
   readonly running: boolean
   /** 仅表示最后一个过程项异常结束；历史失败由 failureCount 保留。 */
   readonly error: boolean
 }
 
+/** 从聊天节点存储中读取指定键对应的节点。 */
 function nodeAt(store: ChatNodeStore, key: string): ChatNode | undefined {
   return store.get(key) as ChatNode | undefined
 }
@@ -73,6 +83,7 @@ interface ActivityEntry {
   readonly kind: 'reasoning' | 'tool'
 }
 
+/** 将内部条目的运行和失败标记转换为成员展示状态。 */
 function memberState(entry: ActivityEntry): ActivityMemberState {
   if (entry.running) return 'running'
   return entry.error ? 'error' : 'done'

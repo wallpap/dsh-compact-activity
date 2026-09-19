@@ -24,6 +24,7 @@ let previousMutationObserver: typeof globalThis.MutationObserver | undefined
 let previousRequestAnimationFrame: typeof globalThis.requestAnimationFrame | undefined
 let previousCancelAnimationFrame: typeof globalThis.cancelAnimationFrame | undefined
 
+/** 创建性能测试页面，并可选地接管 requestAnimationFrame 以控制帧刷新。 */
 function installDom(controlFrames = false): HTMLElement {
   dom = new JSDOM('<!doctype html><body><div id="root"></div></body>')
   previousMutationObserver = globalThis.MutationObserver
@@ -76,6 +77,7 @@ function installDom(controlFrames = false): HTMLElement {
   return dom.window.document.querySelector<HTMLElement>('#root') as HTMLElement
 }
 
+/** 执行当前积累的模拟动画帧，并返回执行的回调数量。 */
 function flushFrames(): number {
   const pending = frameCallbacks
   if (pending === undefined) return 0
@@ -103,6 +105,7 @@ afterEach(() => {
   previousCancelAnimationFrame = undefined
 })
 
+/** 构造性能测试使用的最小 assistant-step 节点。 */
 function assistant(
   key: string,
   text: string,
@@ -121,17 +124,20 @@ function assistant(
   }
 }
 
+/** 将性能测试节点包装为最小 ChatNodeStore。 */
 function nodeStore(nodes: readonly ChatNode[]): ChatNodeStore {
   const byKey = new Map(nodes.map(node => [node.key, node]))
   return { get: key => byKey.get(key), values: () => nodes }
 }
 
+/** 流式更新基准测试所需的 DOM 节点和重渲染入口。 */
 interface StreamingFixture {
   readonly flow: HTMLElement
   readonly textNode: Text
   rerender(text: string): void
 }
 
+/** 构造包含历史过程行和一个流式更新行的性能夹具。 */
 function renderFixture(historyRows = HISTORY_ROWS, controlFrames = false): StreamingFixture {
   const container = installDom(controlFrames)
   const flow = document.createElement('div')
@@ -183,10 +189,12 @@ function renderFixture(historyRows = HISTORY_ROWS, controlFrames = false): Strea
   return { flow, textNode, rerender }
 }
 
+/** 等待 MutationObserver 回调完成，避免在异步更新尚未处理时采样指标。 */
 function waitForMutationFlush(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0))
 }
 
+/** 一轮流式更新基准测试的观测指标。 */
 interface StreamingMetrics {
   readonly tops: number
   readonly updates: number
@@ -198,6 +206,7 @@ interface StreamingMetrics {
   readonly effectiveTops: number
 }
 
+/** 按给定的更新频率驱动夹具，并收集观察器和同步开销。 */
 async function simulateStreaming(fixture: StreamingFixture, tops: number, durationMs: number): Promise<StreamingMetrics> {
   const updates = Math.round(tops * durationMs / 1_000)
   const started = performance.now()

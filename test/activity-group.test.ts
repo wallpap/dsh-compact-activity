@@ -6,6 +6,7 @@ import type {
 import type { ChatNode, ChatNodeStore } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { activityGroups } from '../src/client/activity-group.ts'
 
+/** 构造最小的 assistant-step 测试节点。 */
 function assistant(
   key: string,
   blocks: readonly AssistantBlock[],
@@ -23,6 +24,7 @@ function assistant(
   }
 }
 
+/** 构造成功结束的工具结果，可附带嵌套调用。 */
 function settledTool(callId: string, name: string, subCalls: readonly ToolCallBlock[] = []): ToolResultNode {
   // 保持夹具最小；subCalls 专门用于验证生产代码的递归计数语义。
   return {
@@ -38,10 +40,12 @@ function settledTool(callId: string, name: string, subCalls: readonly ToolCallBl
   }
 }
 
+/** 构造通过布尔错误标记表示失败的工具结果。 */
 function errorTool(callId: string, name: string, subCalls: readonly ToolCallBlock[] = []): ToolResultNode {
   return { ...settledTool(callId, name, subCalls), isError: true }
 }
 
+/** 构造通过结构化 error 字段表示失败的工具结果。 */
 function structuredErrorTool(callId: string, name: string): ToolResultNode {
   // DSH 0.1.6-alpha.2 在 isError 之外保留结构化工具错误。
   // 显式夹具可防止分组逻辑退回只有布尔值的旧契约。
@@ -51,6 +55,7 @@ function structuredErrorTool(callId: string, name: string): ToolResultNode {
   }
 }
 
+/** 构造已经结束的顶层工具调用节点。 */
 function tool(key: string, name: string): ChatNode<'tool-call'> {
   return {
     key,
@@ -64,6 +69,7 @@ function tool(key: string, name: string): ChatNode<'tool-call'> {
   }
 }
 
+/** 构造包含失败结果的顶层工具调用节点。 */
 function errorResultTool(key: string, name: string): ChatNode<'tool-call'> {
   return {
     ...tool(key, name),
@@ -71,6 +77,7 @@ function errorResultTool(key: string, name: string): ChatNode<'tool-call'> {
   }
 }
 
+/** 构造仅通过终端非零退出码表示失败的工具调用节点。 */
 function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'tool-call'> {
   // 模拟 DSH 未设置 isError、但终端进程已非零退出的情况。
   return {
@@ -85,6 +92,7 @@ function failedTerminalTool(key: string, name: string, exitCode = 1): ChatNode<'
   }
 }
 
+/** 构造仍在运行中的工具调用节点，可附带已完成的子调用。 */
 function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock[] = []): ChatNode<'tool-call'> {
   // RunningToolCall 没有 kind，这是 activity-group 区分运行中与已完成调用的依据。
   const root: RunningToolCall = {
@@ -108,6 +116,7 @@ function runningTool(key: string, name: string, subCalls: readonly ToolCallBlock
   }
 }
 
+/** 将测试节点包装为生产代码使用的最小 ChatNodeStore。 */
 function nodeStore(nodes: readonly ChatNode[]): ChatNodeStore {
   const values = [...nodes]
   const byKey = new Map(values.map(node => [node.key, node]))

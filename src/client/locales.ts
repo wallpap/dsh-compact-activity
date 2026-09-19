@@ -1,7 +1,9 @@
 import type { LocaleDictOf, LocaleNamespaceMap } from '@deepseek-ai/dsh-client-ui-slots'
 
+/** 插件在 DSH Locale 注册表中的命名空间。 */
 export const ACTIVITY_NS = 'compact-activity' as const
 
+/** 插件使用的全部文案键。 */
 export type CompactActivityKey =
   | 'status.running'
   | 'status.done'
@@ -24,6 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/** 中文文案。 */
 export const zh: LocaleDictOf<typeof ACTIVITY_NS> = {
   'status.running': '进行中...',
   'status.done': '已完成',
@@ -40,6 +43,7 @@ export const zh: LocaleDictOf<typeof ACTIVITY_NS> = {
   'count.images': '{count} 张图片',
 }
 
+/** 英文文案，作为未匹配中文环境时的回退。 */
 export const en: LocaleDictOf<typeof ACTIVITY_NS> = {
   'status.running': 'In progress...',
   'status.done': 'Done',

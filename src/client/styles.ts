@@ -1,3 +1,4 @@
+/** 注入宿主页面的样式元素标识。 */
 export const STYLE_ID = 'dsh-compact-activity'
 
 /**
@@ -10,22 +11,21 @@ export const STYLE_TEXT = String.raw`
   display: none !important;
 }
 
-/* hidden=until-found intentionally retains a layout box. This marker is
-   plugin-owned, so it can remove that box without taking ownership of the
-   host's hidden attribute. */
+/* hidden=until-found 会保留布局盒。该标记由插件所有，因此插件可以移除
+   布局盒，而不接管宿主的 hidden 属性。 */
 [data-dca-hidden] {
   display: none !important;
 }
 
-/* Image folding owns only this marker/target pair. The host image subtree is
-   kept in place so its loader and lightbox remain under DSH's control. */
+/* 图片折叠只管理这一对标记和目标。宿主图片子树保持原位，使加载器和
+   灯箱交互继续由 DSH 控制。 */
 [data-dca-image-hidden],
 [data-dca-image-caption-hidden] {
   display: none !important;
 }
 
-/* Image targets stay in the host DOM. During a user-triggered toggle, the
-   controller delays hidden=display:none until the leave transition finishes. */
+/* 图片目标保留在宿主 DOM 中。用户触发切换时，控制器会等离场过渡结束后
+   再设置 hidden=display:none。 */
 [data-dca-image-transition] {
   pointer-events: none;
   transition:
@@ -39,8 +39,8 @@ export const STYLE_TEXT = String.raw`
   transform: translateY(-4px) scale(0.985);
 }
 
-/* Captions are plugin-owned siblings placed after the host image target, so
-   they leave the layout in the same phase as the image instead of first. */
+/* 标题是插件所有的兄弟节点，放在宿主图片目标之后，使其与图片在同一阶段
+   离开布局，而不是提前离开。 */
 [data-dca-image-caption-transition] {
   pointer-events: none;
   transition:
@@ -75,16 +75,15 @@ export const STYLE_TEXT = String.raw`
 }
 
 .dca-image-group-inline {
-  /* Keep the collapsed marker compact without laying its caption beside it. */
+  /* 保持折叠标记紧凑，避免标题在折叠状态下与标记并排布局。 */
   display: inline-block;
   max-width: 100%;
   margin: 0;
   vertical-align: top;
 }
 
-/* Markdown renders standalone images in paragraphs with a 16px host rhythm.
-   Image-only paragraphs use the plugin's 8px rhythm instead; mixed prose
-   paragraphs retain the host spacing. */
+/* Markdown 会将独立图片渲染在段落中，并应用宿主的 16px 间距。
+   只有图片的段落改用插件的 8px 间距；包含正文的段落保留宿主间距。 */
 [data-dca-image-container] {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
@@ -212,9 +211,8 @@ export const STYLE_TEXT = String.raw`
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Keep the plugin flow denser than the host's 16px transcript rhythm. The
-   marker, its first row, consecutive process rows, and the first external row
-   after a hidden group all use one 8px rhythm. */
+/* 插件过程流比宿主的 16px 对话间距更紧凑。标记、第一条过程行、连续过程行
+   以及隐藏组之后的第一条外部行统一使用 8px 间距。 */
 .dca-activity-group[data-dca-spaced],
 .dca-activity-group + .dca-activity-row,
 .dca-activity-row + .dca-activity-row,
@@ -222,14 +220,14 @@ export const STYLE_TEXT = String.raw`
   margin-top: 8px !important;
 }
 
-/* DSH uses hidden=until-found for inline Think blocks. That state keeps the
-   block's layout box; while our group is closed it must not reserve that box. */
+/* DSH 会对内联 Think 块使用 hidden=until-found。该状态会保留布局盒；
+   总折叠关闭时不能继续占用这个布局盒。 */
 .dca-activity-group:not([open]) ~ .dca-activity-row [data-turn-process-inline][hidden] {
   display: none !important;
 }
 
-/* A mixed official assistant row has Think and正文 as siblings in this body.
-   Keep that boundary on the same 8px rhythm as the collapsed flow rows. */
+/* 混合官方 assistant 行会在此 body 中并列放置 Think 和正文。
+   该边界与折叠过程行保持相同的 8px 间距。 */
 .dca-activity-inline-body {
   row-gap: 8px !important;
 }
@@ -419,11 +417,10 @@ export const STYLE_TEXT = String.raw`
   transition: background-color 120ms ease;
 }
 
-/* DSH's collapsed flow roots keep a fixed 24px host height. The card adds
-   4px vertical padding on both sides, so reserve the complete 32px box; this
-   keeps the official 24px disclosure row centered instead of overflowing
-   below the card. Use min-height because DSH owns a fixed 24px height on the
-   same root. The plugin-owned marker avoids CSS-module class-name coupling. */
+/* DSH 的折叠过程根节点保持固定的 24px 宿主高度。卡片上下各增加 4px
+   内边距，因此需要预留完整的 32px 盒子，确保官方 24px 折叠行保持居中，
+   不会溢出卡片底部。由于同一根节点的 24px 高度由 DSH 控制，这里使用
+   min-height。插件自有标记可避免依赖 CSS Module 的类名。 */
 .dca-activity-member[data-dca-member-collapsed] {
   min-height: calc(32px + var(--dsh-content-font-delta, 0px)) !important;
 }

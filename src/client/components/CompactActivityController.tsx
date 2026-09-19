@@ -7,6 +7,7 @@ import {
 import { ACTIVITY_NS } from '../locales.ts'
 
 type ActivityTranslate = TranslateNS<typeof ACTIVITY_NS>
+/** 会话头部动作 slot 向控制器提供的运行时属性和本地化函数。 */
 type ControllerProps = PropsRuntime<'conversation.session.header.actions'> & { t: ActivityTranslate }
 
 const MARKER_ATTRIBUTE = 'data-dca-activity-group'
@@ -50,14 +51,14 @@ const IMAGE_BUTTON_SELECTOR = [
   'button[data-variant="thumbnail"]',
 ].join(',')
 const MARKDOWN_IMAGE_SELECTOR = 'img[loading="lazy"][decoding="async"][referrerpolicy="no-referrer"]'
-// dsh-client-ui-primitives replaces rejected or failed Markdown images with a
-// CSS-module span instead of keeping <img>. The class hash is not a stable
-// host contract across bundled DSH versions, so the class selector is only a
-// fast path; isMarkdownImageFallback also recognizes the semantic <p><span>
-// fallback shape used by the renderer.
+// dsh-client-ui-primitives 会将被拒绝或加载失败的 Markdown 图片替换为
+// CSS Module span，而不是保留 <img>。类名哈希不是不同 DSH 构建版本间的
+// 稳定宿主契约，因此类选择器只作为快速路径；isMarkdownImageFallback
+// 还会识别渲染器使用的语义化 <p><span> 回退结构。
 const MARKDOWN_IMAGE_ALT_SELECTOR = 'span[class*="imageAlt"]'
 type ImageTransitionKind = 'enter' | 'leave'
 
+/** 单个图片或标题过渡的可取消状态。 */
 interface ImageTransitionState {
   readonly kind: ImageTransitionKind
   readonly token: number
@@ -80,11 +81,13 @@ const IMAGE_RELEVANT_ATTRIBUTES = new Set([
   'referrerpolicy',
 ])
 
+/** 一个官方过程成员对应的 DOM 元素及其合并后的状态。 */
 interface MemberElement {
   readonly element: HTMLElement
   readonly state: ActivityMemberState
 }
 
+/** 一组应由同一个图片折叠标记控制的图片显示。 */
 interface ImageTarget {
   readonly element: HTMLElement
   readonly elements: readonly HTMLElement[]
@@ -93,16 +96,19 @@ interface ImageTarget {
   readonly labels: readonly ImageLabel[]
 }
 
+/** 图片标题及其可选的原始路径。 */
 interface ImageLabel {
   readonly name: string
   readonly path: string | undefined
 }
 
+/** 从 assistant 正文中解析出的 Markdown 图片引用。 */
 interface MarkdownImageReference {
   readonly source: string
   readonly alt: string
 }
 
+/** 按聊天行键保存的 Markdown 图片引用集合。 */
 type MarkdownImageReferences = ReadonlyMap<string, readonly MarkdownImageReference[]>
 
 const MARKDOWN_IMAGE_REFERENCE_PATTERN = /!\[([^\]\n]*)\]\(\s*(?:<([^>\n]*)>|([^\s)\n]+))(?:\s+["'][^)]*["'])?\s*\)/gu
@@ -115,11 +121,13 @@ function resolvedMemberState(element: HTMLElement, state: ActivityMemberState): 
   return 'done'
 }
 
+/** 收集容器内的官方聊天行，并按稳定的 Chat Flow 键索引。 */
 function rowsIn(container: HTMLElement): Map<string, HTMLElement> {
   return new Map([...container.querySelectorAll<HTMLElement>('[data-chat-flow-key]')]
     .map(row => [row.dataset['chatFlowKey'] ?? '', row]))
 }
 
+/** 读取当前容器已经创建的总折叠标记，并按分组键建立索引。 */
 function markersIn(container: HTMLElement): Map<string, HTMLDetailsElement> {
   return new Map([...container.querySelectorAll<HTMLDetailsElement>(`details[${MARKER_ATTRIBUTE}]`)]
     .map(marker => [marker.dataset['dcaActivityGroup'] ?? '', marker]))
@@ -152,12 +160,14 @@ function memberElementsIn(
   return result
 }
 
+/** 移除插件添加到过程成员上的样式类、状态和布局标记。 */
 function clearMemberPresentation(element: HTMLElement): void {
   element.classList.remove(MEMBER_CLASS, MEMBER_FIRST_CLASS, MEMBER_LAST_CLASS)
   element.removeAttribute(MEMBER_COLLAPSED_ATTRIBUTE)
   delete element.dataset['dcaMemberState']
 }
 
+/** 只管理插件写入的隐藏状态，避免覆盖宿主或其他插件的 hidden 属性。 */
 function setPluginHidden(element: HTMLElement, hidden: boolean): void {
   if (hidden) {
     element.dataset[PLUGIN_HIDDEN_DATASET] = ''
@@ -169,6 +179,7 @@ function setPluginHidden(element: HTMLElement, hidden: boolean): void {
   if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
 }
 
+/** 读取图片折叠标记，并清理同一标识下多余的重复标记。 */
 function imageMarkersIn(container: HTMLElement): Map<string, HTMLDetailsElement> {
   const markers = new Map<string, HTMLDetailsElement>()
   for (const marker of container.querySelectorAll<HTMLDetailsElement>(`details[${IMAGE_MARKER_ATTRIBUTE}]`)) {
@@ -180,6 +191,7 @@ function imageMarkersIn(container: HTMLElement): Map<string, HTMLDetailsElement>
   return markers
 }
 
+/** 写入图片目标的即时隐藏状态，并保留该状态的所有权标记。 */
 function setImageHiddenState(element: HTMLElement, hidden: boolean): void {
   if (hidden) {
     element.dataset[IMAGE_HIDDEN_DATASET] = ''
@@ -191,6 +203,7 @@ function setImageHiddenState(element: HTMLElement, hidden: boolean): void {
   if (element.getAttribute('hidden') === '') element.removeAttribute('hidden')
 }
 
+/** 取消图片目标正在进行的动画帧和定时器。 */
 function cancelImageTransition(element: HTMLElement): void {
   const state = imageTransitions.get(element)
   if (state === undefined) {
@@ -205,15 +218,18 @@ function cancelImageTransition(element: HTMLElement): void {
   delete element.dataset[IMAGE_TRANSITION_DATASET]
 }
 
+/** 立即设置图片目标的隐藏状态，并先终止未完成的过渡。 */
 function setImageHidden(element: HTMLElement, hidden: boolean): void {
   cancelImageTransition(element)
   setImageHiddenState(element, hidden)
 }
 
+/** 根据宿主媒体查询判断是否应禁用图片过渡动画。 */
 function prefersReducedMotion(): boolean {
   return globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 
+/** 完成图片目标过渡；离场过渡结束后才真正移出布局。 */
 function finishImageTransition(element: HTMLElement, state: ImageTransitionState): void {
   if (imageTransitions.get(element)?.token !== state.token) return
   imageTransitions.delete(element)
@@ -221,6 +237,7 @@ function finishImageTransition(element: HTMLElement, state: ImageTransitionState
   if (state.kind === 'leave') setImageHiddenState(element, true)
 }
 
+/** 在保持 DOM 原位的前提下，启动图片目标的进入或离场过渡。 */
 function transitionImageVisibility(element: HTMLElement, visible: boolean): void {
   const current = imageTransitions.get(element)
   const targetKind: ImageTransitionKind = visible ? 'enter' : 'leave'
@@ -255,11 +272,13 @@ function transitionImageVisibility(element: HTMLElement, visible: boolean): void
   state.timer = setTimeout(() => finishImageTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
 }
 
+/** 写入图片标题的即时隐藏状态。标题使用独立标记，便于与图片同步过渡。 */
 function setImageCaptionHiddenState(element: HTMLElement, hidden: boolean): void {
   if (hidden) element.dataset[IMAGE_CAPTION_HIDDEN_DATASET] = ''
   else delete element.dataset[IMAGE_CAPTION_HIDDEN_DATASET]
 }
 
+/** 取消图片标题正在进行的动画帧和定时器。 */
 function cancelImageCaptionTransition(element: HTMLElement): void {
   const state = imageCaptionTransitions.get(element)
   if (state === undefined) {
@@ -274,6 +293,7 @@ function cancelImageCaptionTransition(element: HTMLElement): void {
   delete element.dataset[IMAGE_CAPTION_TRANSITION_DATASET]
 }
 
+/** 完成图片标题过渡，并在离场后将标题从布局中移除。 */
 function finishImageCaptionTransition(element: HTMLElement, state: ImageTransitionState): void {
   if (imageCaptionTransitions.get(element)?.token !== state.token) return
   imageCaptionTransitions.delete(element)
@@ -281,6 +301,7 @@ function finishImageCaptionTransition(element: HTMLElement, state: ImageTransiti
   if (state.kind === 'leave') setImageCaptionHiddenState(element, true)
 }
 
+/** 启动图片标题的进入或离场过渡，并处理用户快速反复切换的情况。 */
 function transitionImageCaption(element: HTMLElement, open: boolean): void {
   const current = imageCaptionTransitions.get(element)
   const targetKind: ImageTransitionKind = open ? 'enter' : 'leave'
@@ -315,6 +336,7 @@ function transitionImageCaption(element: HTMLElement, open: boolean): void {
   state.timer = setTimeout(() => finishImageCaptionTransition(element, state), IMAGE_TRANSITION_DURATION_MS)
 }
 
+/** 将图片标题的实际隐藏状态同步到目标值；必要时继续未完成的过渡。 */
 function syncImageCaptionVisibility(element: HTMLElement, hidden: boolean): void {
   const transition = imageCaptionTransitions.get(element)
   const expectedKind: ImageTransitionKind = hidden ? 'leave' : 'enter'
@@ -327,6 +349,7 @@ function syncImageCaptionVisibility(element: HTMLElement, hidden: boolean): void
   if (captionHidden !== hidden) setImageCaptionHiddenState(element, hidden)
 }
 
+/** 删除图片折叠标记及其插件生成的标题节点。 */
 function removeImageMarker(marker: HTMLDetailsElement): void {
   const caption = imageCaptions.get(marker)
   if (caption !== undefined) {
@@ -337,6 +360,7 @@ function removeImageMarker(marker: HTMLDetailsElement): void {
   marker.remove()
 }
 
+/** 判断节点是否属于图片段落，并允许其参与图片容器识别。 */
 function isImageContainerChild(node: Node): boolean {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent?.trim() === ''
   if (!(node instanceof HTMLElement)) return false
@@ -348,8 +372,8 @@ function isImageContainerChild(node: Node): boolean {
     || node.matches('a') && node.querySelector(MARKDOWN_IMAGE_SELECTOR) !== null
 }
 
-/** Return an image-only Markdown paragraph whose host margins can be replaced
- * by the plugin's 8px image rhythm without changing mixed prose paragraphs. */
+/** 返回只有图片的 Markdown 段落，使插件可以将宿主边距替换为 8px 图片间距，
+ * 同时不改变包含混合正文的段落。 */
 function imageContainerFor(element: HTMLElement): HTMLElement | undefined {
   const parent = element.parentElement
   if (parent === null || parent.localName !== 'p') return undefined
@@ -357,18 +381,20 @@ function imageContainerFor(element: HTMLElement): HTMLElement | undefined {
   return children.length > 0 && children.every(isImageContainerChild) ? parent : undefined
 }
 
+/** 识别 DSH 为失败 Markdown 图片生成的替代文本节点。 */
 function isMarkdownImageFallback(element: Element): boolean {
   if (element.matches(MARKDOWN_IMAGE_ALT_SELECTOR)) return true
   if (!(element instanceof HTMLElement) || element.localName !== 'span') return false
   const paragraph = element.parentElement
   if (paragraph === null || paragraph.localName !== 'p') return false
-  // A rejected Markdown image is rendered as <p><span>alt</span></p>. Keep the
-  // fallback structural check narrow so ordinary inline spans are not folded.
+  // 被拒绝的 Markdown 图片会渲染为 <p><span>alt</span></p>。回退结构检查必须
+  // 保持足够严格，避免将普通的内联 span 误折叠。
   return [...paragraph.childNodes].every(node => node === element
     || node.nodeType === Node.TEXT_NODE && node.textContent?.trim() === ''
     || node instanceof HTMLElement && node.matches(`[${IMAGE_MARKER_ATTRIBUTE}], .${IMAGE_CAPTION_CLASS}`))
 }
 
+/** 从 assistant 节点的文本块中提取 Markdown 图片引用，并按聊天行归类。 */
 function markdownImageReferencesIn(
   rows: ReadonlyMap<string, HTMLElement>,
   chat: Readonly<{ nodes: ChatNodeStore }>,
@@ -394,11 +420,13 @@ function markdownImageReferencesIn(
   return references
 }
 
+/** 读取 Windows 当前工作目录中的盘符，用于区分 Windows 和 POSIX 路径。 */
 function windowsDrive(cwd: string | undefined): string | undefined {
   const drive = cwd === undefined ? undefined : /^([A-Za-z]:)[\\/]/u.exec(cwd)?.[1]
   return drive
 }
 
+/** 规范化 Windows 路径，并处理当前目录和父目录片段。 */
 function normalizeWindowsPath(value: string): string {
   const normalized = value.replaceAll('/', '\\')
   const drive = /^[A-Za-z]:/u.exec(normalized)?.[0] ?? ''
@@ -415,6 +443,7 @@ function normalizeWindowsPath(value: string): string {
   return `${drive}\\${stack.join('\\')}`
 }
 
+/** 规范化 POSIX 路径，并处理当前目录和父目录片段。 */
 function normalizePosixPath(value: string): string {
   const absolute = value.startsWith('/')
   const stack: string[] = []
@@ -429,7 +458,7 @@ function normalizePosixPath(value: string): string {
   return `${absolute ? '/' : ''}${stack.join('/')}` || (absolute ? '/' : '.')
 }
 
-/** Resolve an authored Markdown path in the current Session's execution world. */
+/** 按当前 Session 的执行环境解析 Markdown 中记录的图片路径。 */
 function resolveMarkdownImagePath(source: string, cwd: string | undefined): string | undefined {
   const value = source.trim()
   if (value === '' || /^\/\//u.test(value) || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value)) return undefined
@@ -443,6 +472,7 @@ function resolveMarkdownImagePath(source: string, cwd: string | undefined): stri
   return cwd === undefined ? undefined : normalizePosixPath(`${cwd}/${value}`)
 }
 
+/** 根据当前页面地址构造宿主提供的文件 API 地址。 */
 function fileApiUrl(path: string): string | undefined {
   const location = globalThis.window?.location
   if (location === undefined || (location.protocol !== 'http:' && location.protocol !== 'https:')) return undefined
@@ -451,6 +481,7 @@ function fileApiUrl(path: string): string | undefined {
   return url.href
 }
 
+/** 从宿主图片元素的 /api/file 地址中取回原始图片路径。 */
 function authoredPathFromImage(image: HTMLImageElement): string | undefined {
   const source = image.getAttribute('src')
   if (source === null || source === '') return undefined
@@ -462,6 +493,7 @@ function authoredPathFromImage(image: HTMLImageElement): string | undefined {
   }
 }
 
+/** 将宿主图片的原始路径修复为当前会话可访问的文件 API 地址。 */
 function repairMarkdownImageElement(image: HTMLImageElement, cwd: string | undefined): void {
   const authored = authoredPathFromImage(image)
   if (authored === undefined) return
@@ -475,6 +507,7 @@ function repairMarkdownImageElement(image: HTMLImageElement, cwd: string | undef
   image.src = url
 }
 
+/** 找出聊天行中的宿主 Markdown 图片元素和图片失败回退节点。 */
 function markdownDisplaysIn(row: HTMLElement): HTMLElement[] {
   return [...row.querySelectorAll<HTMLElement>(`${MARKDOWN_IMAGE_SELECTOR}, span`)]
     .filter(element => element.matches(MARKDOWN_IMAGE_SELECTOR)
@@ -482,39 +515,45 @@ function markdownDisplaysIn(row: HTMLElement): HTMLElement[] {
         && element.dataset[IMAGE_REPAIR_FALLBACK_DATASET] === undefined)
 }
 
+/** 从图片显示节点中读取实际的 img 元素。 */
 function imageElementFromDisplay(element: HTMLElement): HTMLImageElement | undefined {
   if (element.localName === 'img') return element as HTMLImageElement
   return element.querySelector<HTMLImageElement>('img') ?? undefined
 }
 
+/** 读取图片的替代文本，并在没有替代文本时回退到节点文本。 */
 function imageNameFromDisplay(element: HTMLElement): string {
   const image = imageElementFromDisplay(element)
   if (image !== undefined && image.alt.trim() !== '') return image.alt.trim()
   return oneLine(element.textContent) || 'image'
 }
 
+/** 从图片显示节点中读取宿主保留的原始路径。 */
 function imagePathFromDisplay(element: HTMLElement): string | undefined {
   const image = imageElementFromDisplay(element)
   return image === undefined ? undefined : authoredPathFromImage(image)
 }
 
+/** 生成 Markdown 引用用于匹配图片显示的路径键。 */
 function imageReferencePathKey(reference: MarkdownImageReference, cwd: string | undefined): string {
   return resolveMarkdownImagePath(reference.source, cwd) ?? reference.source.trim()
 }
 
+/** 生成已渲染图片用于匹配 Markdown 引用的路径键。 */
 function imageDisplayPathKey(display: HTMLElement, cwd: string | undefined): string | undefined {
   const path = imagePathFromDisplay(display)
   return path === undefined ? undefined : resolveMarkdownImagePath(path, cwd) ?? path
 }
 
+/** 一组与同一个原始 Markdown 引用关联的宿主图片显示。 */
 interface MarkdownImageDisplayGroup {
   readonly key: string
   readonly displays: readonly HTMLElement[]
   readonly reference: MarkdownImageReference | undefined
 }
 
-/** Assign every rendered Markdown display to one authored reference. This also
- * folds transient duplicate DOM displays into one logical image target. */
+/** 将每个已渲染的 Markdown 图片显示对应到一个原始引用；同时将流式渲染期间
+ * 暂时重复的 DOM 显示合并为一个逻辑图片目标。 */
 function markdownDisplayGroupsIn(
   row: HTMLElement,
   references: readonly MarkdownImageReference[],
@@ -543,6 +582,7 @@ function markdownDisplayGroupsIn(
   return groups
 }
 
+/** 选择图片折叠实际控制的 DOM 目标；纯图片链接使用链接本身作为目标。 */
 function imageTargetElement(display: HTMLElement): HTMLElement {
   const image = imageElementFromDisplay(display)
   if (image === null || image === undefined) return display
@@ -556,7 +596,7 @@ function imageTargetElement(display: HTMLElement): HTMLElement {
     : display
 }
 
-/** Repair Windows root-relative Markdown paths before DSH replaces the image with alt text. */
+/** 在 DSH 将 Windows 根相对路径的图片替换为替代文本前，修复其图片地址。 */
 function repairMarkdownImages(
   rows: ReadonlyMap<string, HTMLElement>,
   references: MarkdownImageReferences,
@@ -606,8 +646,10 @@ function repairMarkdownImages(
   }
 }
 
+/** 图片目标在同一聊天行内的合并键，可以是 DOM 元素或解析出的引用键。 */
 type ImageTargetKey = string | HTMLElement
 
+/** 收集每个聊天行中的官方图片画廊和 Markdown 图片目标。 */
 function imageTargetsIn(
   container: HTMLElement,
   rows: ReadonlyMap<string, HTMLElement>,
@@ -641,9 +683,8 @@ function imageTargetsIn(
     targetsByRow.set(row, targets)
   }
 
-  // Query the flow once per sync instead of querying every Chat row. This keeps
-  // the image pass cheap during high-frequency streaming updates when no image
-  // is present in most rows.
+  // 每轮同步只查询一次 Chat Flow，不在每条聊天行上重复查询。这样在高频流式
+  // 更新且大多数行没有图片时，图片扫描的成本更低。
   for (const button of container.querySelectorAll<HTMLElement>(IMAGE_BUTTON_SELECTOR)) {
     const row = rowFor(button)
     if (row === undefined || !acceptsImages(row, button)) continue
@@ -680,15 +721,17 @@ function imageTargetsIn(
     row,
     [...targets.values()].sort((left, right) => {
       const position = left.element.compareDocumentPosition(right.element)
-      return position & 4 /* Node.DOCUMENT_POSITION_FOLLOWING */ ? -1 : 1
+      return position & 4 /* Node.DOCUMENT_POSITION_FOLLOWING：当前节点之后的节点 */ ? -1 : 1
     }),
   ]))
 }
 
+/** 根据图片数量选择带单复数的本地化文案。 */
 function imageLabel(count: number, t: ActivityTranslate): string {
   return t(count === 1 ? 'count.image' : 'count.images', { count })
 }
 
+/** 生成图片折叠标记上的摘要；单图优先显示图片名称。 */
 function imageSummaryLabel(target: ImageTarget, t: ActivityTranslate): string {
   const first = target.labels[0]
   if (target.count === 1 && first !== undefined) {
@@ -697,11 +740,13 @@ function imageSummaryLabel(target: ImageTarget, t: ActivityTranslate): string {
   return imageLabel(target.count, t)
 }
 
+/** 生成图片展开后的标题，并在可用时附带原始路径。 */
 function imageCaption(label: ImageLabel, fallback: string): string {
   const name = oneLine(label.name) || label.path || fallback
   return label.path === undefined ? name : `${name}（${label.path}）`
 }
 
+/** 从图片标记的数据属性中解析标题列表，异常数据按空列表处理。 */
 function imageLabelsFromMarker(marker: HTMLDetailsElement): readonly ImageLabel[] {
   const raw = marker.dataset[IMAGE_MARKER_LABELS_DATASET]
   if (raw === undefined) return []
@@ -720,6 +765,7 @@ function imageLabelsFromMarker(marker: HTMLDetailsElement): readonly ImageLabel[
   }
 }
 
+/** 创建或更新图片折叠标记的 summary 和展开标题节点。 */
 function setImageMarkerText(
   marker: HTMLDetailsElement,
   target: ImageTarget,
@@ -768,6 +814,7 @@ function setImageMarkerText(
   return details
 }
 
+/** 当语言切换时，仅更新现有图片标记的本地化文案。 */
 function syncImageLabelsIn(container: HTMLElement, t: ActivityTranslate): void {
   for (const marker of imageMarkersIn(container).values()) {
     const count = Number(marker.dataset['dcaImageCount'])
@@ -782,14 +829,17 @@ function syncImageLabelsIn(container: HTMLElement, t: ActivityTranslate): void {
   }
 }
 
+/** 同时隐藏或显示一个图片目标包含的全部宿主元素。 */
 function setImageTargetHidden(target: ImageTarget, hidden: boolean): void {
   for (const element of target.elements) setImageHidden(element, hidden)
 }
 
+/** 为图片目标中的全部宿主元素启动相同方向的过渡。 */
 function transitionImageTarget(target: ImageTarget, open: boolean): void {
   for (const element of target.elements) transitionImageVisibility(element, open)
 }
 
+/** 将图片目标的可见性同步到目标状态，并衔接已有的中断过渡。 */
 function syncImageTargetVisibility(target: ImageTarget, hidden: boolean): void {
   for (const element of target.elements) {
     const transition = imageTransitions.get(element)
@@ -805,9 +855,9 @@ function syncImageTargetVisibility(target: ImageTarget, hidden: boolean): void {
 }
 
 /**
- * Fold non-user images without moving or replacing the host's image subtree.
- * The marker is an independent details element; the original gallery/image
- * remains in React's DOM position and is only hidden until the marker opens.
+ * 折叠非用户消息中的图片，但不移动或替换宿主的图片子树。
+ * 标记是独立的 details 元素；原始画廊或图片仍保留在 React 的 DOM 位置，
+ * 仅在标记展开前保持隐藏。
  */
 function syncImageGroups(
   container: HTMLElement,
@@ -878,15 +928,16 @@ function syncImageGroups(
   }
 }
 
-/**
- * 为本组的官方过程项附加展示标记。嵌套工具调用只参与计数，仍由根工具组件
- * 保持自己的官方层级，因此不会在这里生成第二个顶层子项。
- */
+/** 判断官方 Think 或工具过程项当前是否处于展开状态。 */
 function memberDisclosureOpen(element: HTMLElement): boolean {
   if (element.dataset['variant'] === 'think') return element.hasAttribute('data-expanded')
   return element.querySelector('[data-open]') !== null
 }
 
+/**
+ * 为本组的官方过程项附加展示标记。嵌套工具调用只参与计数，仍由根工具组件
+ * 保持自己的官方层级，因此不会在这里生成第二个顶层子项。
+ */
 function syncGroupMembers(
   rows: ReadonlyMap<string, HTMLElement>,
   group: ActivityGroup,
@@ -920,10 +971,9 @@ function setGroupOpen(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGro
     if (key === group.partialKey) {
       for (const reasoning of row.querySelectorAll<HTMLElement>('[data-variant="think"]')) {
         reasoning.classList.toggle(REASONING_CHILD_CLASS, !open)
-        // DSH only adds data-turn-process-inline while its own total process
-        // disclosure is closed. When that disclosure is open, the same
-        // wrapper remains attribute-less; hide it too or the empty flex item
-        // still contributes both sides of the official 16px body gap.
+        // DSH 仅在官方总过程折叠关闭时添加 data-turn-process-inline。
+        // 官方折叠展开后，同一个包装节点不会保留该属性；此时也要隐藏它，
+        // 否则空的 flex 项仍会在官方 16px 正文间距两侧占位。
         const parent = reasoning.parentElement
         const inlineProcess = reasoning.closest<HTMLElement>('[data-turn-process-inline]')
           ?? (parent?.childElementCount === 1 && parent.firstElementChild === reasoning ? parent : undefined)
@@ -937,6 +987,7 @@ function setGroupOpen(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGro
   }
 }
 
+/** 为总折叠标记和组前后的可见过程行同步间距类。 */
 function syncGroupSpacing(
   marker: HTMLDetailsElement,
   group: ActivityGroup,
@@ -945,8 +996,8 @@ function syncGroupSpacing(
   if (marker.previousElementSibling !== null) marker.dataset['dcaSpaced'] = ''
   else delete marker.dataset['dcaSpaced']
 
-  // The marker is followed by hidden process rows in the DOM. Space the first
-  // visible row as well, including a partial assistant row that keeps正文.
+  // DOM 中标记后面仍跟着隐藏的过程行。第一条可见行也需要补间距，
+  // 包括保留正文的部分 assistant 行。
   let sibling = marker.nextElementSibling
   while (sibling !== null) {
     if (sibling instanceof HTMLElement && sibling.matches('[data-chat-flow-key]') && !sibling.hidden) {
@@ -968,7 +1019,7 @@ function syncGroupSpacing(
   }
 }
 
-/** Remove the layout box retained by DSH's searchable hidden process rows. */
+/** 移除 DSH 为支持搜索而保留的隐藏过程行布局盒。 */
 function syncOfficialHiddenRows(rows: ReadonlyMap<string, HTMLElement>): void {
   for (const row of rows.values()) {
     if (row.hasAttribute('data-turn-process-hidden')) {
@@ -978,11 +1029,12 @@ function syncOfficialHiddenRows(rows: ReadonlyMap<string, HTMLElement>): void {
     }
     if (row.dataset[OFFICIAL_HIDDEN_DATASET] === undefined) continue
     delete row.dataset[OFFICIAL_HIDDEN_DATASET]
-    // A closed plugin group still owns this row's hidden state.
+    // 插件总折叠关闭时，该行的隐藏状态仍由插件管理。
     if (!row.classList.contains(CHILD_CLASS)) setPluginHidden(row, false)
   }
 }
 
+/** 查找与过程组首行属于同一会话轮次的官方折叠控制。 */
 function officialTurnControl(
   container: HTMLElement,
   group: ActivityGroup,
@@ -994,6 +1046,7 @@ function officialTurnControl(
     .find(control => control.dataset['turnProcess'] === turn)
 }
 
+/** 将官方总过程折叠状态同步到插件自己的总折叠标记。 */
 function syncOfficialTurnVisibility(
   container: HTMLElement,
   marker: HTMLDetailsElement,
@@ -1011,6 +1064,7 @@ function syncOfficialTurnVisibility(
   }
 }
 
+/** 将文本压缩为单行，供摘要、标题和路径匹配使用。 */
 function oneLine(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim()
 }
@@ -1035,6 +1089,7 @@ function officialToolSummary(
   return summary.length === 0 ? title : `${title} · ${summary.join(' ')}`
 }
 
+/** 读取当前组的实时摘要；思考使用固定文案，工具复用官方摘要。 */
 function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGroup, t: ActivityTranslate): string {
   if (!group.running) return ''
   return group.latestKind === 'reasoning' ? t('status.thinking') : officialToolSummary(rows, group, t)
@@ -1042,6 +1097,7 @@ function liveSummary(rows: ReadonlyMap<string, HTMLElement>, group: ActivityGrou
 
 type CountKind = 'reasoning' | 'tool' | 'failure'
 
+/** 总折叠中一个计数项的类型、数量和本地化标签。 */
 interface CountItem {
   readonly kind: CountKind
   readonly count: number
@@ -1054,6 +1110,7 @@ const COUNT_ICON_MARKUP: Readonly<Record<CountKind, string>> = {
   failure: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/>',
 }
 
+/** 生成总折叠中需要展示的思考、工具和失败计数。 */
 function countItems(group: ActivityGroup, t: ActivityTranslate): readonly CountItem[] {
   const items: CountItem[] = []
   if (group.reasoningCount > 0) {
@@ -1080,6 +1137,7 @@ function countItems(group: ActivityGroup, t: ActivityTranslate): readonly CountI
   return items
 }
 
+/** 创建总折叠和图片折叠共用的右向箭头 SVG。 */
 function disclosureIcon(className: string): SVGSVGElement {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   icon.classList.add(className)
@@ -1097,6 +1155,7 @@ function disclosureIcon(className: string): SVGSVGElement {
   return icon
 }
 
+/** 创建计数项使用的 SVG 图标，并按计数类型选择路径。 */
 function countIcon(kind: CountKind): SVGSVGElement {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   const outline = kind !== 'reasoning'
@@ -1115,6 +1174,7 @@ function countIcon(kind: CountKind): SVGSVGElement {
   return icon
 }
 
+/** 根据分组状态和实时摘要更新总折叠标记，避免无变化时重建 DOM。 */
 function setMarkerText(
   marker: HTMLDetailsElement,
   group: ActivityGroup,
@@ -1259,6 +1319,7 @@ function syncContainer(
   }
 }
 
+/** 将当前 React 快照同步到页面中的每个可见 Chat Flow。 */
 function sync(
   groups: readonly ActivityGroup[],
   t: ActivityTranslate,
@@ -1273,19 +1334,23 @@ function sync(
   }
 }
 
+/** 判断 MutationObserver 节点是否为 Element。 */
 function isElement(node: Node): node is Element {
   return node.nodeType === 1
 }
 
+/** 判断节点本身或其祖先是否位于 DSH Chat Flow 中。 */
 function isInChatFlow(node: Node): boolean {
   const element = isElement(node) ? node : node.parentElement
   return element !== null && element !== undefined && element.closest('[data-chat-flow]') !== null
 }
 
+/** 判断节点的新增或移除子树中是否包含 Chat Flow。 */
 function containsChatFlow(node: Node): boolean {
   return isElement(node) && (node.matches('[data-chat-flow]') || node.querySelector('[data-chat-flow]') !== null)
 }
 
+/** 判断节点本身或其子树中是否包含需要折叠的图片显示。 */
 function containsImageDisplay(node: Node): boolean {
   if (!isElement(node)) return false
   return node.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)
@@ -1297,12 +1362,12 @@ function containsImageDisplay(node: Node): boolean {
     || [...node.querySelectorAll('span')].some(isMarkdownImageFallback)
 }
 
+/** 判断 MutationObserver 记录是否需要重新扫描图片目标。 */
 function affectsImages(records: readonly MutationRecord[]): boolean {
   return records.some(record => {
     if (record.type === 'childList') {
-      // The marker owns a summary and caption subtree. Those internal updates
-      // are not image-display changes; only mounting/removing the marker itself
-      // should request an image rescan.
+      // 标记自身拥有 summary 和标题子树。这些子树的内部更新不属于图片显示
+      // 变化；只有标记本身的挂载或移除才需要重新扫描图片。
       if (isElement(record.target) && record.target.matches(`[${IMAGE_MARKER_ATTRIBUTE}]`)) return false
       return [...record.addedNodes, ...record.removedNodes].some(containsImageDisplay)
     }
@@ -1322,6 +1387,7 @@ function affectsChatFlow(records: readonly MutationRecord[]): boolean {
       && [...record.addedNodes, ...record.removedNodes].some(containsChatFlow)))
 }
 
+/** 清理插件写入的过程、图片、隐藏和过渡状态。 */
 function cleanup(): void {
   for (const row of document.querySelectorAll<HTMLElement>(`.${CHILD_CLASS}`)) row.classList.remove(CHILD_CLASS)
   for (const row of document.querySelectorAll<HTMLElement>(`.${ROW_CLASS}`)) row.classList.remove(ROW_CLASS)
@@ -1430,7 +1496,7 @@ export function CompactActivityController(props: ControllerProps): null {
       else queueMicrotask(flush)
     }
     scheduleRef.current = schedule
-    // ponytail: DSH 当前只通过稳定 DOM 标记暴露跨行分组能力；若官方增加过程组
+    // 预留：DSH 当前只通过稳定 DOM 标记暴露跨行分组能力；若官方增加过程组
     // slot，应删除此观察器并直接接入该 slot。
     const observer = new MutationObserver(records => {
       if (affectsChatFlow(records)) schedule(affectsImages(records))
